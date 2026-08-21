@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RIGO Mejorado — Propuesta · Gobierno de Matamoros</title>
+<meta name="description" content="Prototipo navegable de mejora para la plataforma RIGO (Respuesta Integral de Gobierno) de Matamoros, Tamaulipas.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800;900&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* ============================================================
+   RIGO MEJORADO — Sistema de diseño
+   Paleta institucional: guinda + oro + semáforo de estatus
+   Tipografía: Archivo (display) · Public Sans (texto) · IBM Plex Mono (folios/datos)
+   ============================================================ */
+:root{
+  --guinda:#7A1F2B;
+  --guinda-2:#5C1420;
+  --guinda-3:#93293A;
+  --oro:#C2953A;
+  --oro-suave:#F3E7CB;
+  --papel:#F7F4EF;
+  --blanco:#FFFFFF;
+  --tinta:#271A1E;
+  --tinta-2:#6F5E63;
+  --linea:#E5DDD3;
+  --verde:#2E7D4F;
+  --verde-suave:#E3F0E8;
+  --ambar:#B67A1C;
+  --ambar-suave:#F7ECD8;
+  --rojo:#B3392E;
+  --rojo-suave:#F6E3E1;
+  --radio:14px;
+  --sombra:0 1px 2px rgba(39,26,30,.06), 0 8px 24px rgba(39,26,30,.07);
+  --transicion:180ms ease;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Public Sans',system-ui,-apple-system,sans-serif;
+  background:var(--papel);
+  color:var(--tinta);
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;display:block}
+button{font-family:inherit;cursor:pointer}
+a{color:var(--guinda)}
+:focus-visible{outline:3px solid var(--oro);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  html{scroll-behavior:auto}
+}
+
+/* ---------- Cinta de propuesta ---------- */
+.cinta-demo{
+  background:var(--tinta);
+  color:#EFE7DA;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:.72rem;
+  letter-spacing:.06em;
+  text-align:center;
+  padding:7px 14px;
+  text-transform:uppercase;
+}
+.cinta-demo strong{color:var(--oro)}
+
+/* ---------- Encabezado ---------- */
+header.top{
+  background:var(--guinda);
+  color:#fff;
+  position:sticky;
+  top:0;
+  z-index:60;
+  box-shadow:0 2px 12px rgba(39,26,30,.25);
+}
+.top-inner{
+  max-width:1100px;margin:0 auto;padding:12px 18px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.marca{display:flex;align-items:baseline;gap:10px;text-decoration:none;color:#fff}
+.marca .logo{
+  font-family:'Archivo',sans-serif;font-weight:900;font-size:1.5rem;letter-spacing:.01em;
+}
+.marca .logo span{color:var(--oro)}
+.marca .sub{
+  font-family:'IBM Plex Mono',monospace;font-size:.66rem;letter-spacing:.09em;
+  text-transform:uppercase;color:#E8CFA0;
+}
+.top-tel{
+  margin-left:auto;display:flex;align-items:center;gap:8px;
+  font-size:.85rem;color:#F3E3E6;
+}
+.top-tel a{color:#fff;font-weight:700;text-decoration:none;font-family:'IBM Plex Mono',monospace}
+
+/* ---------- Navegación de vistas ---------- */
+nav.vistas{
+  background:var(--guinda-2);
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  scrollbar-width:none;
+}
+nav.vistas::-webkit-scrollbar{display:none}
+.vistas-inner{
+  max-width:1100px;margin:0 auto;display:flex;gap:2px;padding:0 10px;
+}
+.vista-btn{
+  background:transparent;border:none;color:#E9D4D8;
+  font-family:'Public Sans',sans-serif;font-weight:600;font-size:.86rem;
+  padding:12px 16px;white-space:nowrap;border-bottom:3px solid transparent;
+  transition:var(--transicion);
+}
+.vista-btn:hover{color:#fff}
+.vista-btn[aria-current="page"]{color:#fff;border-bottom-color:var(--oro)}
+
+/* ---------- Estructura general ---------- */
+main{max-width:1100px;margin:0 auto;padding:0 18px 90px}
+.view{display:none}
+.view.active{display:block;animation:aparecer .3s ease}
+@keyframes aparecer{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+section{margin-top:46px}
+.eyebrow{
+  font-family:'IBM Plex Mono',monospace;font-size:.7rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--guinda);font-weight:600;
+  display:flex;align-items:center;gap:10px;margin-bottom:12px;
+}
+.eyebrow::before{content:"";width:26px;height:2px;background:var(--oro);display:inline-block}
+h1,h2,h3{font-family:'Archivo',sans-serif;line-height:1.12;letter-spacing:-.01em}
+h2{font-size:clamp(1.5rem,3.4vw,2.1rem);font-weight:800;margin-bottom:10px}
+h3{font-size:1.06rem;font-weight:700}
+.lead{color:var(--tinta-2);max-width:56ch}
+
+/* ---------- Botones ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  border-radius:999px;font-weight:700;font-size:.95rem;
+  padding:13px 24px;border:2px solid transparent;
+  transition:var(--transicion);text-decoration:none;
+}
+.btn-primario{background:var(--guinda);color:#fff}
+.btn-primario:hover{background:var(--guinda-3)}
+.btn-oro{background:var(--oro);color:var(--tinta)}
+.btn-oro:hover{filter:brightness(1.06)}
+.btn-borde{background:transparent;color:var(--guinda);border-color:var(--guinda)}
+.btn-borde:hover{background:var(--guinda);color:#fff}
+.btn-borde-claro{background:transparent;color:#fff;border-color:rgba(255,255,255,.65)}
+.btn-borde-claro:hover{background:rgba(255,255,255,.12)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-mini{padding:8px 16px;font-size:.84rem}
+
+/* ---------- Héroe ---------- */
+.hero{
+  background:linear-gradient(160deg,var(--guinda) 0%,var(--guinda-2) 78%);
+  color:#fff;border-radius:0 0 22px 22px;
+  margin:0 -18px;
+  padding:56px 18px 46px;
+  position:relative;overflow:hidden;
+}
+.hero::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(194,149,58,.25), transparent 42%),
+    repeating-linear-gradient(-45deg, rgba(255,255,255,.028) 0 2px, transparent 2px 14px);
+}
+.hero-inner{max-width:1100px;margin:0 auto;position:relative;z-index:1}
+.hero .eyebrow{color:#E8CFA0}
+.hero .eyebrow::before{background:var(--oro)}
+.hero h1{
+  font-size:clamp(1.9rem,5.4vw,3.15rem);font-weight:900;max-width:19ch;
+  margin-bottom:14px;
+}
+.hero h1 em{font-style:normal;color:var(--oro)}
+.hero p{color:#F0DEE1;max-width:52ch;font-size:1.03rem;margin-bottom:26px}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap}
+.hero-datos{
+  display:flex;gap:26px;flex-wrap:wrap;margin-top:34px;
+  border-top:1px solid rgba(255,255,255,.22);padding-top:20px;
+}
+.dato .num{font-family:'Archivo',sans-serif;font-weight:800;font-size:1.45rem;color:#fff}
+.dato .lbl{font-size:.76rem;color:#E4C9CE;text-transform:uppercase;letter-spacing:.05em}
+
+/* ---------- Tarjetas / rejillas ---------- */
+.grid{display:grid;gap:16px}
+.grid-3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.grid-4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.card{
+  background:var(--blanco);border:1px solid var(--linea);border-radius:var(--radio);
+  padding:22px;box-shadow:var(--sombra);
+}
+.card h3{margin-bottom:6px}
+.card p{color:var(--tinta-2);font-size:.92rem}
+.canal-ico{
+  width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  font-size:1.35rem;background:var(--oro-suave);margin-bottom:14px;
+}
+.canal-dato{
+  font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--guinda);
+  font-size:.95rem;margin-top:10px;display:inline-block;text-decoration:none;
+}
+.canal-dato:hover{text-decoration:underline}
+
+/* Pasos "cómo funciona" */
+.paso{position:relative;padding-left:0}
+.paso .n{
+  font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--oro);
+  font-size:.8rem;letter-spacing:.1em;margin-bottom:8px;display:block;
+}
+
+/* ---------- Asistente de reporte (wizard) ---------- */
+.wizard{background:var(--blanco);border:1px solid var(--linea);border-radius:var(--radio);
+  box-shadow:var(--sombra);overflow:hidden;margin-top:22px}
+.wizard-head{
+  display:flex;border-bottom:1px solid var(--linea);background:#FBF9F5;
+  overflow-x:auto;scrollbar-width:none;
+}
+.wizard-head::-webkit-scrollbar{display:none}
+.wz-step{
+  flex:1;min-width:120px;padding:13px 10px;text-align:center;
+  font-size:.76rem;font-weight:600;color:var(--tinta-2);
+  border-bottom:3px solid transparent;white-space:nowrap;
+}
+.wz-step .n{font-family:'IBM Plex Mono',monospace;color:var(--oro);margin-right:6px}
+.wz-step.act{color:var(--guinda);border-bottom-color:var(--guinda)}
+.wz-step.done{color:var(--verde)}
+.wz-body{padding:26px 22px}
+.wz-panel{display:none}
+.wz-panel.act{display:block;animation:aparecer .25s ease}
+.wz-foot{
+  display:flex;justify-content:space-between;gap:10px;
+  padding:16px 22px;border-top:1px solid var(--linea);background:#FBF9F5;
+}
+
+/* Categorías */
+.cats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:14px}
+.cat{
+  border:2px solid var(--linea);border-radius:12px;background:#fff;
+  padding:16px 12px;text-align:center;transition:var(--transicion);
+  font-weight:600;font-size:.85rem;color:var(--tinta);line-height:1.3;
+}
+.cat .ico{font-size:1.55rem;display:block;margin-bottom:8px}
+.cat small{display:block;font-weight:500;color:var(--tinta-2);font-size:.68rem;margin-top:4px;font-family:'IBM Plex Mono',monospace}
+.cat:hover{border-color:var(--oro)}
+.cat[aria-pressed="true"]{border-color:var(--guinda);background:var(--oro-suave);box-shadow:inset 0 0 0 1px var(--guinda)}
+
+/* Selector de eventualidades (catálogo oficial) */
+.buscador-cat{position:relative;margin-top:16px}
+.buscador-cat input{
+  width:100%;padding:13px 16px 13px 44px;border:1.5px solid var(--linea);border-radius:12px;
+  font:inherit;background:#fff;
+}
+.buscador-cat input:focus{border-color:var(--guinda);outline:none;box-shadow:0 0 0 3px rgba(122,31,43,.12)}
+.buscador-cat::before{
+  content:"🔍";position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:1rem;
+}
+.grupos{margin-top:14px;display:grid;gap:10px}
+.grupo{border:1.5px solid var(--linea);border-radius:12px;background:#fff;overflow:hidden;transition:var(--transicion)}
+.grupo.abierta{border-color:var(--oro)}
+.grupo-cab{
+  width:100%;display:flex;align-items:center;gap:12px;padding:14px 16px;
+  background:none;border:none;text-align:left;font:inherit;font-weight:700;font-size:.92rem;color:var(--tinta);
+}
+.grupo-cab .ico{font-size:1.3rem}
+.grupo-cab .cuenta{
+  margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--tinta-2);
+  background:#F2EDE4;border-radius:999px;padding:3px 10px;white-space:nowrap;
+}
+.grupo-cab .caret{color:var(--tinta-2);font-size:.8rem;transition:var(--transicion)}
+.grupo.abierta .caret{transform:rotate(180deg)}
+.chips{display:none;flex-wrap:wrap;gap:8px;padding:2px 14px 15px}
+.grupo.abierta .chips{display:flex}
+.evento-chip{
+  display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--linea);border-radius:999px;
+  background:#FBF9F5;padding:8px 8px 8px 14px;font:inherit;font-size:.83rem;font-weight:600;color:var(--tinta);
+  transition:var(--transicion);
+}
+.evento-chip .cod{
+  font-family:'IBM Plex Mono',monospace;font-size:.64rem;letter-spacing:.06em;
+  background:#EDE6DA;border-radius:999px;padding:3px 8px;color:var(--tinta-2);
+}
+.evento-chip:hover{border-color:var(--oro)}
+.evento-chip.sel{background:var(--guinda);border-color:var(--guinda);color:#fff}
+.evento-chip.sel .cod{background:rgba(255,255,255,.22);color:#F3E7CB}
+.sel-actual{
+  display:none;align-items:flex-start;gap:10px;margin-top:16px;
+  background:var(--verde-suave);border:1px solid #BFDCCB;border-radius:12px;
+  padding:12px 16px;font-size:.88rem;font-weight:600;color:var(--verde);
+}
+.sel-actual.on{display:flex}
+.sel-actual small{display:block;font-weight:500;font-size:.76rem;color:#37634A;margin-top:4px;line-height:1.45}
+.dir-busca{display:flex;gap:8px}
+.dir-busca input{flex:1}
+.sin-result{display:none;color:var(--tinta-2);font-size:.87rem;padding:14px 4px}
+
+/* Mapa Leaflet */
+#mapa{
+  height:320px;border-radius:12px;border:1.5px solid var(--linea);z-index:1;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);
+}
+.pin-wrap{filter:drop-shadow(0 6px 8px rgba(39,26,30,.35))}
+.pin-rigo{
+  width:30px;height:30px;background:var(--guinda);border:3px solid #fff;
+  border-radius:50% 50% 50% 0;transform:rotate(-45deg);position:relative;
+}
+.pin-rigo::after{
+  content:"";position:absolute;inset:0;margin:auto;width:9px;height:9px;
+  background:var(--oro);border-radius:50%;
+}
+.coords{
+  display:flex;align-items:center;gap:10px;margin-top:10px;
+  font-family:'IBM Plex Mono',monospace;font-size:.8rem;color:var(--tinta-2);
+  background:#FBF9F5;border:1px dashed var(--linea);border-radius:10px;padding:10px 14px;
+}
+.coords.ok{border-style:solid;border-color:#BFDCCB;background:var(--verde-suave);color:var(--verde);font-weight:600}
+.dir-inversa{font-size:.8rem;color:var(--tinta-2);margin-top:8px;line-height:1.6}
+.dir-inversa b{color:var(--tinta)}
+.leaflet-container{font-family:'Public Sans',sans-serif}
+
+/* Campos */
+.field{margin-bottom:18px}
+.field label{display:block;font-weight:600;font-size:.88rem;margin-bottom:6px}
+.field .ayuda{font-size:.78rem;color:var(--tinta-2);margin-top:5px}
+.field input[type=text],.field input[type=tel],.field select,.field textarea{
+  width:100%;padding:12px 14px;border:1.5px solid var(--linea);border-radius:10px;
+  font:inherit;background:#fff;color:var(--tinta);transition:var(--transicion);
+}
+.field input:focus,.field select:focus,.field textarea:focus{
+  border-color:var(--guinda);outline:none;box-shadow:0 0 0 3px rgba(122,31,43,.12);
+}
+.field textarea{min-height:110px;resize:vertical}
+.fila-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:620px){.fila-2{grid-template-columns:1fr}}
+.mapa-mini{
+  border:1.5px dashed var(--linea);border-radius:12px;height:150px;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;gap:6px;
+  color:var(--tinta-2);font-size:.85rem;background:
+    repeating-linear-gradient(0deg,#F2EEE7 0 1px,transparent 1px 26px),
+    repeating-linear-gradient(90deg,#F2EEE7 0 1px,transparent 1px 26px),#FBF9F5;
+}
+.dropzone{
+  border:2px dashed var(--linea);border-radius:12px;padding:26px 16px;text-align:center;
+  color:var(--tinta-2);font-size:.88rem;background:#FBF9F5;transition:var(--transicion);
+}
+.dropzone:hover{border-color:var(--oro)}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:.86rem;color:var(--tinta-2);margin-top:14px}
+.check input{margin-top:3px;accent-color:var(--guinda);width:17px;height:17px}
+.resumen{
+  background:#FBF9F5;border:1px solid var(--linea);border-radius:12px;padding:16px 18px;
+  font-size:.88rem;margin-bottom:18px;
+}
+.resumen dt{font-family:'IBM Plex Mono',monospace;font-size:.68rem;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--tinta-2);margin-top:10px}
+.resumen dd{font-weight:600}
+.resumen dt:first-child{margin-top:0}
+
+/* ---------- Talón de folio (firma visual) ---------- */
+.ticket{
+  background:#fff;border:1px solid var(--linea);border-radius:var(--radio);
+  box-shadow:var(--sombra);position:relative;overflow:hidden;max-width:560px;
+}
+.ticket-top{
+  background:var(--guinda);color:#fff;padding:16px 22px;
+  display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+}
+.ticket-top .t1{font-family:'Archivo',sans-serif;font-weight:800;font-size:1rem}
+.ticket-top .t2{font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:#E8CFA0;letter-spacing:.1em;text-transform:uppercase}
+.ticket-mid{padding:24px 22px;text-align:center;position:relative}
+.ticket-mid::before,.ticket-mid::after{
+  content:"";position:absolute;top:-11px;width:22px;height:22px;border-radius:50%;
+  background:var(--papel);border:1px solid var(--linea);
+}
+.ticket-mid::before{left:-11px}
+.ticket-mid::after{right:-11px}
+.folio-lbl{font-family:'IBM Plex Mono',monospace;font-size:.68rem;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--tinta-2)}
+.folio-num{
+  font-family:'IBM Plex Mono',monospace;font-weight:600;
+  font-size:clamp(1.5rem,5.6vw,2.1rem);color:var(--guinda);
+  letter-spacing:.04em;margin:8px 0 4px;
+}
+.ticket-sep{border-top:2px dashed var(--linea);margin:0 22px;position:relative}
+.ticket-low{padding:18px 22px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.nota-chica{font-size:.78rem;color:var(--tinta-2);text-align:center;padding:0 22px 20px}
+
+/* ---------- Semáforo de estatus (línea de tiempo) ---------- */
+.chip{
+  display:inline-flex;align-items:center;gap:7px;border-radius:999px;
+  font-size:.78rem;font-weight:700;padding:5px 13px;
+}
+.chip::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.chip-verde{background:var(--verde-suave);color:var(--verde)}
+.chip-ambar{background:var(--ambar-suave);color:var(--ambar)}
+.chip-rojo{background:var(--rojo-suave);color:var(--rojo)}
+.chip-gris{background:#EFEAE2;color:var(--tinta-2)}
+
+.timeline{list-style:none;margin-top:18px}
+.tl{display:flex;gap:16px;position:relative;padding-bottom:26px}
+.tl:last-child{padding-bottom:4px}
+.tl::before{
+  content:"";position:absolute;left:13px;top:30px;bottom:0;width:2px;background:var(--linea);
+}
+.tl:last-child::before{display:none}
+.tl .pto{
+  width:28px;height:28px;border-radius:50%;flex-shrink:0;z-index:1;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.8rem;font-weight:800;border:2px solid var(--linea);background:#fff;color:var(--tinta-2);
+}
+.tl.done .pto{background:var(--verde);border-color:var(--verde);color:#fff}
+.tl.now .pto{background:#fff;border-color:var(--ambar);color:var(--ambar);box-shadow:0 0 0 5px var(--ambar-suave)}
+.tl.now.ok .pto{border-color:var(--verde);color:var(--verde);background:var(--verde);color:#fff;box-shadow:0 0 0 5px var(--verde-suave)}
+.tl .txt b{display:block;font-size:.94rem}
+.tl .txt time{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--tinta-2)}
+.tl .txt p{font-size:.85rem;color:var(--tinta-2);margin-top:3px;max-width:46ch}
+.tl.pend{opacity:.5}
+
+/* Consulta */
+.busca-folio{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.busca-folio input{
+  flex:1;min-width:220px;padding:13px 16px;border:1.5px solid var(--linea);border-radius:12px;
+  font-family:'IBM Plex Mono',monospace;font-size:1rem;letter-spacing:.03em;
+}
+.busca-folio input:focus{border-color:var(--guinda);outline:none;box-shadow:0 0 0 3px rgba(122,31,43,.12)}
+.detalle-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 18px;font-size:.88rem;margin-top:14px}
+.detalle-grid dt{font-family:'IBM Plex Mono',monospace;font-size:.66rem;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--tinta-2);margin-top:10px}
+.detalle-grid dd{font-weight:600}
+.evidencia{display:flex;gap:10px;margin-top:12px}
+.evi{
+  flex:1;height:86px;border-radius:10px;border:1px solid var(--linea);
+  background:linear-gradient(135deg,#EFE9DF,#E2D9CB);
+  display:flex;align-items:center;justify-content:center;color:var(--tinta-2);font-size:.72rem;
+}
+.estrellas{display:flex;gap:6px;margin-top:10px}
+.estrella{
+  background:none;border:none;font-size:1.7rem;color:#D8CFC2;transition:var(--transicion);padding:2px;
+}
+.estrella.on{color:var(--oro)}
+.estrella:hover{transform:scale(1.12)}
+
+/* ---------- Transparencia ---------- */
+.kpi{
+  text-align:left;
+}
+.kpi .num{font-family:'Archivo',sans-serif;font-weight:900;font-size:2rem;color:var(--guinda)}
+.kpi .lbl{font-size:.78rem;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.05em}
+.barra{margin-top:14px}
+.barra .b-lbl{display:flex;justify-content:space-between;font-size:.84rem;font-weight:600;margin-bottom:5px}
+.barra .b-lbl span:last-child{font-family:'IBM Plex Mono',monospace;color:var(--tinta-2);font-weight:500}
+.b-track{height:12px;background:#EFEAE2;border-radius:999px;overflow:hidden}
+.b-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--guinda),var(--guinda-3))}
+.b-fill.oro{background:linear-gradient(90deg,var(--oro),#D9B060)}
+
+/* ---------- Comparativa Hoy vs Propuesta ---------- */
+.cmp{display:grid;gap:12px;margin-top:18px}
+.cmp-row{
+  background:#fff;border:1px solid var(--linea);border-radius:12px;
+  display:grid;grid-template-columns:170px 1fr 1fr;overflow:hidden;
+}
+.cmp-row>div{padding:15px 16px;font-size:.87rem}
+.cmp-tema{background:#FBF9F5;font-weight:700;border-right:1px solid var(--linea);display:flex;align-items:center}
+.cmp-hoy{color:var(--tinta-2);border-right:1px solid var(--linea)}
+.cmp-hoy .tag,.cmp-prop .tag{
+  font-family:'IBM Plex Mono',monospace;font-size:.62rem;letter-spacing:.12em;text-transform:uppercase;
+  display:block;margin-bottom:5px;
+}
+.cmp-hoy .tag{color:var(--rojo)}
+.cmp-prop .tag{color:var(--verde)}
+.cmp-prop{background:linear-gradient(180deg,#fff, #F7FBF8)}
+@media(max-width:760px){
+  .cmp-row{grid-template-columns:1fr}
+  .cmp-tema{border-right:none;border-bottom:1px solid var(--linea)}
+  .cmp-hoy{border-right:none;border-bottom:1px dashed var(--linea)}
+}
+.fase{
+  border-left:3px solid var(--oro);padding:4px 0 4px 18px;margin-top:18px;
+}
+.fase .f-n{font-family:'IBM Plex Mono',monospace;font-size:.68rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--guinda);font-weight:600}
+.fase h3{margin:3px 0 4px}
+.fase p{font-size:.9rem;color:var(--tinta-2);max-width:64ch}
+.nota-tec{
+  background:var(--oro-suave);border:1px solid #E4D2A6;border-radius:12px;
+  padding:16px 18px;font-size:.87rem;margin-top:22px;color:#5C4A1E;
+}
+.nota-tec b{color:var(--tinta)}
+
+/* ---------- Pie ---------- */
+footer{
+  background:var(--tinta);color:#CDBFB4;margin-top:70px;
+  padding:40px 18px 30px;font-size:.85rem;
+}
+.foot-inner{max-width:1100px;margin:0 auto;display:grid;gap:26px;grid-template-columns:2fr 1fr 1fr}
+@media(max-width:720px){.foot-inner{grid-template-columns:1fr}}
+footer .logo{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.3rem;color:#fff}
+footer .logo span{color:var(--oro)}
+footer h4{color:#fff;font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px}
+footer a{color:#E3D6C9;text-decoration:none}
+footer a:hover{color:#fff;text-decoration:underline}
+footer ul{list-style:none}
+footer li{margin-bottom:7px}
+.foot-legal{
+  max-width:1100px;margin:26px auto 0;padding-top:18px;border-top:1px solid #4A3D40;
+  font-size:.75rem;color:#9C8D8F;display:flex;gap:14px;flex-wrap:wrap;justify-content:space-between;
+}
+
+/* Utilidades */
+.oculto{display:none!important}
+.exito-ico{
+  width:64px;height:64px;border-radius:50%;background:var(--verde-suave);color:var(--verde);
+  display:flex;align-items:center;justify-content:center;font-size:1.9rem;margin:0 auto 14px;
+}
+.aviso-linea{
+  display:flex;gap:10px;align-items:flex-start;background:#FBF9F5;border:1px solid var(--linea);
+  border-radius:12px;padding:13px 16px;font-size:.84rem;color:var(--tinta-2);margin-top:16px;
+}
+</style>
+</head>
+<body>
+
+<div class="cinta-demo"><strong>Prototipo navegable</strong> · Propuesta de mejora para RIGO · Los datos mostrados son de demostración</div>
+
+<header class="top">
+  <div class="top-inner">
+    <a class="marca" href="#" onclick="ir('inicio');return false">
+      <span class="logo">RIGO<span>+</span></span>
+      <span class="sub">Respuesta Integral de Gobierno · H. Matamoros</span>
+    </a>
+    <div class="top-tel">
+      <span>Atención ciudadana</span>
+      <a href="tel:+528688108000">(868) 810 8000</a>
+    </div>
+  </div>
+  <nav class="vistas" aria-label="Secciones del portal">
+    <div class="vistas-inner">
+      <button class="vista-btn" data-v="inicio" aria-current="page" onclick="ir('inicio')">Inicio</button>
+      <button class="vista-btn" data-v="reportar" onclick="ir('reportar')">Levantar reporte</button>
+      <button class="vista-btn" data-v="consultar" onclick="ir('consultar')">Consultar folio</button>
+      <button class="vista-btn" data-v="transparencia" onclick="ir('transparencia')">Transparencia</button>
+      <button class="vista-btn" data-v="propuesta" onclick="ir('propuesta')">La propuesta</button>
+    </div>
+  </nav>
+</header>
+
+<main>
+
+<!-- ============================ INICIO ============================ -->
+<div class="view active" id="v-inicio">
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow">Gobierno de Matamoros · Servicios públicos</div>
+      <h1>¿Un bache, una luminaria, una fuga? <em>Repórtalo en 2 minutos.</em></h1>
+      <p>RIGO conecta tu reporte con las cuadrillas municipales y el facilitador de tu zona. Recibes un folio, sigues cada avance y confirmas cuando quede resuelto.</p>
+      <div class="hero-cta">
+        <button class="btn btn-oro" onclick="ir('reportar')">Levantar un reporte</button>
+        <button class="btn btn-borde-claro" onclick="ir('consultar')">Consultar mi folio</button>
+      </div>
+      <div class="hero-datos">
+        <div class="dato"><div class="num">~1,400</div><div class="lbl">reportes por semana</div></div>
+        <div class="dato"><div class="num">485</div><div class="lbl">colonias cubiertas</div></div>
+        <div class="dato"><div class="num">60</div><div class="lbl">zonas con facilitador</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Canales de atención</div>
+    <h2>Reporta por donde te quede más cerca</h2>
+    <p class="lead">Todos los canales generan el mismo folio y entran al mismo sistema de seguimiento.</p>
+    <div class="grid grid-3" style="margin-top:22px">
+      <div class="card">
+        <div class="canal-ico">🌐</div>
+        <h3>Portal web</h3>
+        <p>Asistente guiado en 4 pasos, con ubicación en mapa y fotos del problema.</p>
+        <button class="btn btn-mini btn-borde" style="margin-top:12px" onclick="ir('reportar')">Comenzar</button>
+      </div>
+      <div class="card">
+        <div class="canal-ico">💬</div>
+        <h3>WhatsApp RIGO</h3>
+        <p>Escribe, manda foto y ubicación. Recibirás tu folio y cada avance en el mismo chat.</p>
+        <a class="canal-dato" href="https://wa.me/528689800960" target="_blank" rel="noopener">(868) 980 0960</a>
+      </div>
+      <div class="card">
+        <div class="canal-ico">📞</div>
+        <h3>Teléfono</h3>
+        <p>Atención ciudadana en horario de oficina para levantar o consultar reportes.</p>
+        <a class="canal-dato" href="tel:+528688108000">(868) 810 8000</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">¿Cómo funciona?</div>
+    <h2>Del reporte a la solución, sin perderle la pista</h2>
+    <div class="grid grid-4" style="margin-top:22px">
+      <div class="card paso">
+        <span class="n">PASO 1</span>
+        <h3>Reportas</h3>
+        <p>Eliges el tipo de problema, lo ubicas y adjuntas fotos como evidencia.</p>
+      </div>
+      <div class="card paso">
+        <span class="n">PASO 2</span>
+        <h3>Recibes tu folio</h3>
+        <p>Un folio único e irrepetible, también enviado a tu WhatsApp si lo autorizas.</p>
+      </div>
+      <div class="card paso">
+        <span class="n">PASO 3</span>
+        <h3>Sigues el avance</h3>
+        <p>El semáforo del folio te muestra cada etapa: recibido, clasificado, en atención.</p>
+      </div>
+      <div class="card paso">
+        <span class="n">PASO 4</span>
+        <h3>Confirmas el cierre</h3>
+        <p>Ves la evidencia de la cuadrilla, calificas la atención o pides reapertura.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Catálogo de reportes</div>
+    <h2>27 eventualidades oficiales, en 7 familias</h2>
+    <p class="lead">Desde un bache superficial hasta ruido excesivo. Cada eventualidad conserva su código oficial (BAS, LAF, REX…) para entrar directo al sistema de mando.</p>
+    <div class="cats" style="margin-top:20px" aria-hidden="true">
+      <div class="cat"><span class="ico">🕳️</span>Baches y vialidades<small>4 eventualidades</small></div>
+      <div class="cat"><span class="ico">💡</span>Alumbrado público<small>5 eventualidades</small></div>
+      <div class="cat"><span class="ico">💧</span>Agua y drenaje<small>3 eventualidades</small></div>
+      <div class="cat"><span class="ico">🗑️</span>Basura y limpieza<small>4 eventualidades</small></div>
+      <div class="cat"><span class="ico">🌳</span>Parques y áreas verdes<small>4 eventualidades</small></div>
+      <div class="cat"><span class="ico">⚡</span>Postes y cableado<small>4 eventualidades</small></div>
+      <div class="cat"><span class="ico">🏘️</span>Convivencia y vía pública<small>3 eventualidades</small></div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================ REPORTAR ============================ -->
+<div class="view" id="v-reportar">
+  <section>
+    <div class="eyebrow">Nuevo reporte</div>
+    <h2>Levantar un reporte</h2>
+    <p class="lead">Cuatro pasos y menos de dos minutos. Al terminar recibirás un folio para dar seguimiento.</p>
+
+    <div class="wizard" id="wizard">
+      <div class="wizard-head" role="tablist" aria-label="Pasos del reporte">
+        <div class="wz-step act" data-s="1"><span class="n">01</span>Tipo de problema</div>
+        <div class="wz-step" data-s="2"><span class="n">02</span>Ubicación</div>
+        <div class="wz-step" data-s="3"><span class="n">03</span>Evidencia</div>
+        <div class="wz-step" data-s="4"><span class="n">04</span>Contacto y envío</div>
+      </div>
+
+      <div class="wz-body">
+        <!-- Paso 1 -->
+        <div class="wz-panel act" data-p="1">
+          <h3>¿Qué problema quieres reportar?</h3>
+          <p style="color:var(--tinta-2);font-size:.9rem">Busca por nombre o abre una familia. Son las 27 eventualidades oficiales de RIGO, con su código de sistema.</p>
+          <div class="buscador-cat">
+            <input type="text" id="buscar-evento" placeholder="Buscar: lámpara, bache, ruido…" aria-label="Buscar eventualidad">
+          </div>
+          <div class="grupos" id="grupos-cats"></div>
+          <p class="sin-result" id="sin-result">No se encontró ninguna eventualidad con ese nombre. Intenta con otra palabra o abre las familias.</p>
+          <div class="sel-actual" id="sel-actual"><span>✓</span><div><span id="sel-actual-txt"></span><small id="sel-resp"></small></div></div>
+        </div>
+
+        <!-- Paso 2 -->
+        <div class="wz-panel" data-p="2">
+          <h3>¿Dónde está el problema?</h3>
+          <div class="fila-2" style="margin-top:14px">
+            <div class="field">
+              <label for="colonia">Colonia</label>
+              <select id="colonia">
+                <option value="">Selecciona tu colonia…</option>
+                <option>Centro</option>
+                <option>Buenavista</option>
+                <option>Lucio Blanco</option>
+                <option>Integración Familiar</option>
+                <option>Euzkadi</option>
+                <option>Jardín</option>
+                <option>Las Culturas</option>
+                <option>Voluntad y Trabajo</option>
+                <option>Tecnológico</option>
+                <option>Victoria</option>
+              </select>
+              <div class="ayuda">Catálogo oficial de 485 colonias, con búsqueda por texto en la versión final.</div>
+            </div>
+            <div class="field">
+              <label for="calle">Calle y número (o entre calles)</label>
+              <div class="dir-busca">
+                <input type="text" id="calle" placeholder="Ej. Calle Sexta entre González y Morelos">
+                <button class="btn btn-mini btn-borde" type="button" onclick="buscarDireccion()">Ver en mapa</button>
+              </div>
+              <div class="ayuda" id="dir-msg">Escríbela y pulsa "Ver en mapa", o coloca el pin a mano.</div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="refs">Referencias</label>
+            <input type="text" id="refs" placeholder="Ej. frente a la tienda, junto al poste con transformador">
+          </div>
+          <div class="field" style="margin-bottom:8px">
+            <label>Coloca el pin en el punto exacto</label>
+            <div class="ayuda" style="margin:0 0 8px">Toca el mapa o arrastra el pin guinda. La cuadrilla llega directo, sin buscar.</div>
+          </div>
+          <div id="mapa" role="application" aria-label="Mapa para ubicar el reporte"></div>
+          <div class="coords" id="coords">📍 Pin sin colocar — toca el mapa para fijar el punto</div>
+          <div class="dir-inversa" id="dir-detectada"></div>
+          <button class="btn btn-mini btn-borde" style="margin-top:12px" onclick="usarUbicacion()">📍 Usar mi ubicación actual</button>
+          <span id="geo-msg" style="display:block;font-size:.78rem;color:var(--tinta-2);margin-top:8px"></span>
+        </div>
+
+        <!-- Paso 3 -->
+        <div class="wz-panel" data-p="3">
+          <h3>Describe el problema y agrega fotos</h3>
+          <div class="field" style="margin-top:14px">
+            <label for="desc">Descripción</label>
+            <textarea id="desc" placeholder="Ej. La luminaria de la esquina lleva dos semanas apagada; en la noche la calle queda totalmente oscura."></textarea>
+            <div class="ayuda">Entre más referencias des, más rápido se atiende.</div>
+          </div>
+          <div class="dropzone">
+            📷 Toca para tomar una foto o arrastra hasta 3 imágenes aquí<br>
+            <span style="font-size:.76rem">JPG o PNG · máx. 10 MB · sin necesidad de cuenta de correo</span>
+          </div>
+        </div>
+
+        <!-- Paso 4 -->
+        <div class="wz-panel" data-p="4">
+          <h3>Tus datos para darte seguimiento</h3>
+          <div class="fila-2" style="margin-top:14px">
+            <div class="field">
+              <label for="nombre">Nombre</label>
+              <input type="text" id="nombre" placeholder="Nombre y apellido">
+            </div>
+            <div class="field">
+              <label for="tel">Teléfono celular (10 dígitos)</label>
+              <input type="tel" id="tel" placeholder="868 000 0000" inputmode="numeric">
+            </div>
+          </div>
+          <div class="field">
+            <label for="correo">Correo electrónico <span style="font-weight:500;color:var(--tinta-2)">(opcional)</span></label>
+            <input type="text" id="correo" placeholder="tucorreo@ejemplo.com" inputmode="email">
+            <div class="ayuda">Ya no es obligatorio: el seguimiento llega por WhatsApp o consultando tu folio en línea.</div>
+          </div>
+          <dl class="resumen" id="resumen">
+            <dt>Eventualidad</dt><dd id="r-cat">—</dd>
+            <dt>Ubicación</dt><dd id="r-ubi">—</dd>
+            <dt>Punto en el mapa</dt><dd id="r-geo">—</dd>
+            <dt>Dirección detectada</dt><dd id="r-dir">—</dd>
+          </dl>
+          <label class="check">
+            <input type="checkbox" id="wa-optin" checked>
+            <span>Quiero recibir mi folio y los avances de mi reporte por <b>WhatsApp</b>.</span>
+          </label>
+          <label class="check">
+            <input type="checkbox" id="priv">
+            <span>He leído el <a href="https://matamoros.gob.mx/aviso-de-privacidad/" target="_blank" rel="noopener">aviso de privacidad</a>. Mis datos solo se usan para atender este reporte.</span>
+          </label>
+        </div>
+
+        <!-- Éxito -->
+        <div class="wz-panel" data-p="5">
+          <div class="exito-ico">✓</div>
+          <h3 style="text-align:center">¡Tu reporte quedó registrado!</h3>
+          <p style="text-align:center;color:var(--tinta-2);font-size:.92rem;margin:6px 0 20px">Guarda tu folio. Si autorizaste WhatsApp, ya va en camino a tu chat.</p>
+          <div class="ticket" style="margin:0 auto">
+            <div class="ticket-top">
+              <span class="t1">Reporte ciudadano</span>
+              <span class="t2">H. Matamoros · RIGO</span>
+            </div>
+            <div class="ticket-mid">
+              <div class="folio-lbl">Folio de seguimiento</div>
+              <div class="folio-num" id="folio-nuevo">RIGO-2026-004522</div>
+              <div id="tk-evento" style="font-size:.82rem;color:var(--tinta-2);margin-bottom:8px"></div>
+              <span class="chip chip-verde">Recibido</span>
+            </div>
+            <div class="ticket-sep"></div>
+            <div class="ticket-low">
+              <button class="btn btn-mini btn-borde" onclick="copiarFolio()">Copiar folio</button>
+              <button class="btn btn-mini btn-primario" onclick="verMiFolio()">Ver seguimiento</button>
+            </div>
+            <p class="nota-chica" id="copiado-msg">Tiempo estimado de primera clasificación: menos de 24 horas hábiles.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="wz-foot" id="wz-foot">
+        <button class="btn btn-borde btn-mini" id="btn-atras" onclick="pasoAnterior()" disabled>← Regresar</button>
+        <button class="btn btn-primario" id="btn-sig" onclick="pasoSiguiente()" disabled>Continuar →</button>
+      </div>
+    </div>
+
+    <div class="aviso-linea">
+      <span>💬</span>
+      <span>¿Prefieres no llenar el formulario? Manda foto y ubicación al WhatsApp <a href="https://wa.me/528689800960" target="_blank" rel="noopener"><b>(868) 980 0960</b></a> y el asistente levanta el reporte por ti, con el mismo folio y seguimiento.</span>
+    </div>
+  </section>
+</div>
+
+<!-- ============================ CONSULTAR ============================ -->
+<div class="view" id="v-consultar">
+  <section>
+    <div class="eyebrow">Seguimiento</div>
+    <h2>Consultar mi folio</h2>
+    <p class="lead">Escribe tu folio para ver en qué etapa va tu reporte, quién lo atiende y la evidencia del cierre.</p>
+
+    <div class="busca-folio">
+      <input type="text" id="folio-input" value="RIGO-2026-004521" aria-label="Número de folio" placeholder="RIGO-2026-000000">
+      <button class="btn btn-primario" onclick="consultarFolio()">Consultar</button>
+    </div>
+    <p style="font-size:.8rem;color:var(--tinta-2);margin-top:8px">¿Tu folio es del formato anterior o tiene dos números, por ejemplo "45210 (44987)"? Escribe el primero: el sistema reconoce ambos.</p>
+
+    <div id="resultado-folio" class="oculto" style="margin-top:26px">
+      <div class="ticket" style="max-width:100%">
+        <div class="ticket-top">
+          <div>
+            <span class="t1" id="rf-folio">RIGO-2026-004521</span><br>
+            <span class="t2">Alumbrado Público · Lámpara Fundida (LAF)</span>
+          </div>
+          <span class="chip chip-verde" style="background:rgba(255,255,255,.16);color:#fff">Resuelto</span>
+        </div>
+        <div style="padding:20px 22px">
+          <dl class="detalle-grid">
+            <div><dt>Recibido el</dt><dd>12 de agosto de 2026, 9:14</dd></div>
+            <div><dt>Canal</dt><dd>WhatsApp</dd></div>
+            <div><dt>Colonia</dt><dd>Buenavista</dd></div>
+            <div><dt>Zona de atención</dt><dd>Zona 41 · Facilitadora: Kahori Salas</dd></div>
+            <div><dt>Área responsable</dt><dd>Servicios Públicos · Alumbrado</dd></div>
+            <div><dt>Cuadrilla</dt><dd>Alumbrado Norte 2</dd></div>
+          </dl>
+
+          <ol class="timeline">
+            <li class="tl done">
+              <span class="pto">✓</span>
+              <div class="txt">
+                <b>Recibido</b>
+                <time>12 ago 2026 · 9:14</time>
+                <p>Reporte capturado por WhatsApp con foto y ubicación.</p>
+              </div>
+            </li>
+            <li class="tl done">
+              <span class="pto">✓</span>
+              <div class="txt">
+                <b>Clasificado</b>
+                <time>12 ago 2026 · 11:02</time>
+                <p>Asignado a Servicios Públicos y notificado a la facilitadora de la Zona 41.</p>
+              </div>
+            </li>
+            <li class="tl done">
+              <span class="pto">✓</span>
+              <div class="txt">
+                <b>En atención</b>
+                <time>14 ago 2026 · 8:30</time>
+                <p>Cuadrilla programada y en sitio. Se confirmó lámpara fundida (LAF); se programó el reemplazo.</p>
+              </div>
+            </li>
+            <li class="tl now ok">
+              <span class="pto">✓</span>
+              <div class="txt">
+                <b>Resuelto</b>
+                <time>15 ago 2026 · 13:47</time>
+                <p>Lámpara reemplazada y encendida, verificada en campo. Evidencia de la cuadrilla:</p>
+                <div class="evidencia">
+                  <div class="evi">Foto antes</div>
+                  <div class="evi">Foto después</div>
+                </div>
+              </div>
+            </li>
+            <li class="tl pend">
+              <span class="pto">5</span>
+              <div class="txt">
+                <b>Cerrado</b>
+                <p>El folio se cierra automáticamente 5 días después de resuelto, o antes si confirmas la solución.</p>
+              </div>
+            </li>
+          </ol>
+
+          <div style="border-top:1px solid var(--linea);margin-top:22px;padding-top:18px">
+            <b style="font-size:.95rem">¿Cómo calificas la atención?</b>
+            <div class="estrellas" id="estrellas" aria-label="Calificación de 1 a 5 estrellas">
+              <button class="estrella" data-n="1" aria-label="1 estrella">★</button>
+              <button class="estrella" data-n="2" aria-label="2 estrellas">★</button>
+              <button class="estrella" data-n="3" aria-label="3 estrellas">★</button>
+              <button class="estrella" data-n="4" aria-label="4 estrellas">★</button>
+              <button class="estrella" data-n="5" aria-label="5 estrellas">★</button>
+            </div>
+            <p id="gracias-msg" class="oculto" style="font-size:.85rem;color:var(--verde);font-weight:600;margin-top:8px">¡Gracias! Tu calificación ayuda a mejorar el servicio.</p>
+            <button class="btn btn-mini btn-borde" style="margin-top:14px" onclick="reabrir()">El problema sigue: solicitar reapertura</button>
+            <p id="reabierto-msg" class="oculto" style="font-size:.85rem;color:var(--ambar);font-weight:600;margin-top:8px">Solicitud registrada. El folio pasará a estatus "Reabierto" y volverá a programarse.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============================ TRANSPARENCIA ============================ -->
+<div class="view" id="v-transparencia">
+  <section>
+    <div class="eyebrow">Datos abiertos · cifras ilustrativas</div>
+    <h2>Así se está atendiendo Matamoros</h2>
+    <p class="lead">Resumen público alimentado diariamente desde el sistema de mando de RIGO. Sin datos personales: solo el pulso del servicio.</p>
+
+    <div class="grid grid-4" style="margin-top:22px">
+      <div class="card kpi"><div class="num">1,438</div><div class="lbl">Reportes esta semana</div></div>
+      <div class="card kpi"><div class="num">78%</div><div class="lbl">Resueltos en el mes</div></div>
+      <div class="card kpi"><div class="num">4.2 días</div><div class="lbl">Tiempo promedio de solución</div></div>
+      <div class="card kpi"><div class="num">60/60</div><div class="lbl">Zonas con actividad</div></div>
+    </div>
+
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));margin-top:16px">
+      <div class="card">
+        <h3>Lo más reportado este mes</h3>
+        <div class="barra">
+          <div class="b-lbl"><span>💡 Alumbrado público</span><span>34%</span></div>
+          <div class="b-track"><div class="b-fill" style="width:34%"></div></div>
+        </div>
+        <div class="barra">
+          <div class="b-lbl"><span>🗑️ Recolección de basura</span><span>22%</span></div>
+          <div class="b-track"><div class="b-fill" style="width:22%"></div></div>
+        </div>
+        <div class="barra">
+          <div class="b-lbl"><span>🕳️ Baches</span><span>17%</span></div>
+          <div class="b-track"><div class="b-fill" style="width:17%"></div></div>
+        </div>
+        <div class="barra">
+          <div class="b-lbl"><span>💧 Agua y drenaje</span><span>12%</span></div>
+          <div class="b-track"><div class="b-fill" style="width:12%"></div></div>
+        </div>
+        <div class="barra">
+          <div class="b-lbl"><span>📝 Otros</span><span>15%</span></div>
+          <div class="b-track"><div class="b-fill oro" style="width:15%"></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Mapa de calor por zona</h3>
+        <p>Concentración de reportes en las 60 zonas de atención, para orientar programas como Calle a Calle.</p>
+        <div class="mapa-mini" style="height:190px;margin-top:14px">
+          <span>🗺️ Mapa por zonas (DL 09–12)</span>
+          <span style="font-size:.75rem">En la versión final: Leaflet con el mismo molde de los tableros de zona.</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="aviso-linea">
+      <span>🔍</span>
+      <span>Publicar estas cifras convierte cada reporte en un compromiso visible y reduce las llamadas de "¿cómo va mi folio?". El tablero de mando interno sigue siendo la fuente única de la operación.</span>
+    </div>
+  </section>
+</div>
+
+<!-- ============================ PROPUESTA ============================ -->
+<div class="view" id="v-propuesta">
+  <section>
+    <div class="eyebrow">Documento interno</div>
+    <h2>Qué mejora esta propuesta frente al RIGO actual</h2>
+    <p class="lead">No es un reemplazo: es una capa ciudadana sobre la infraestructura que ya opera (formulario Tactica + tablero de mando). Cada mejora responde a un problema observado.</p>
+
+    <div class="cmp">
+      <div class="cmp-row">
+        <div class="cmp-tema">Seguimiento del folio</div>
+        <div class="cmp-hoy"><span class="tag">Hoy</span>El ciudadano recibe un folio, pero no existe página pública para consultarlo: el seguimiento vive solo en el tablero interno y en llamadas al 810 8000.</div>
+        <div class="cmp-prop"><span class="tag">Propuesta</span>Página "Consultar folio" con semáforo detallado, área responsable, zona/facilitador y evidencia fotográfica del cierre.</div>
+      </div>
+      <div class="cmp-row">
+        <div class="cmp-tema">Estatus visibles</div>
+        <div class="cmp-hoy"><span class="tag">Hoy</span>Semáforo básico (en proceso / resuelto); en la app de campo cinco estatus se colapsan en un solo "Pendiente".</div>
+        <div class="cmp-prop"><span class="tag">Propuesta</span>Ciclo de vida completo: Recibido → Clasificado → En atención → En espera → Resuelto → Cerrado, más Reabierto e Improcedente, idéntico al diseño de Rigo Plus.</div>
+      </div>
+      <div class="cmp-row">
+        <div class="cmp-tema">Formato de folio</div>
+        <div class="cmp-hoy"><span class="tag">Hoy</span>Folios numéricos que a veces se renumeran y aparecen dobles: "actual (anterior)", lo que rompe búsquedas exactas.</div>
+        <div class="cmp-prop"><span class="tag">Propuesta</span>Folio legible y estable RIGO-AAAA-000000; la consulta reconoce también los folios del formato anterior.</div>
+      </div>
+      <div class="cmp-row">
+        <div class="cmp-tema">Notificaciones</div>
+        <div class="cmp-hoy"><span class="tag">Hoy</span>El WhatsApp existente recibe reportes, pero los avances no regresan automáticamente al ciudadano.</div>
+        <div class="cmp-prop"><span class="tag">Propuesta</span>Avisos automáticos por WhatsApp en cada cambio de estatus (API oficial de Meta), con el folio como llave.</div>
+      </div>
+      <div class="cmp-row">
+        <div class="cmp-tema">Experiencia del formulario</div>
+        <div class="cmp-hoy"><span class="tag">Hoy</span>Una sola pantalla que pide nombre, teléfono y correo obligatorios antes de describir el problema; mapa de Google con buscador de dirección; instrucciones duplicadas en la página que lo incrusta.</div>
+        <div class="cmp-prop"><span class="tag">Propuesta</span>Asistente en 4 pasos que empieza por el problema y deja el contacto al final (correo opcional): las 27 eventualidades con buscador y códigos BAS…REX intactos, la dirección municipal responsable visible desde la selección (como ya lo hace el formulario actual), y mapa Leaflet + OpenStreetMap con pin y buscador de dirección — misma función que el mapa de Google, sin llave de API ni costo por carga.</div>
+      </div>
+      <div class="cmp-row">
+        <div class="cmp-tema">Precisión de la ubicación</div>
+        <div class="cmp-hoy"><span class="tag">Hoy</span>La colonia y la dirección las escribe el ciudadano y nada las cruza contra el punto del mapa: un error de dedo manda a la cuadrilla al lugar equivocado.</div>
+        <div class="cmp-prop"><span class="tag">Propuesta</span>Cuatro candados: el pin solo se fija con zoom de calle; el GPS muestra su margen de error en metros; la dirección bajo el pin se verifica en reversa y se le confirma al ciudadano; y en el servidor la colonia y la zona se derivan por punto-en-polígono con la capa oficial de 485 colonias, de modo que la selección del ciudadano pasa a ser verificación y no fuente.</div>
+      </div>
+      <div class="cmp-row">
+        <div class="cmp-tema">Cierre con el ciudadano</div>
+        <div class="cmp-hoy"><span class="tag">Hoy</span>El reporte se cierra en el sistema sin confirmación ni retroalimentación de quien lo levantó.</div>
+        <div class="cmp-prop"><span class="tag">Propuesta</span>Evidencia antes/después, encuesta de satisfacción de 1 a 5 y botón de reapertura con registro en bitácora.</div>
+      </div>
+      <div class="cmp-row">
+        <div class="cmp-tema">Transparencia</div>
+        <div class="cmp-hoy"><span class="tag">Hoy</span>Las cifras viven en el tablero de mando, de acceso interno.</div>
+        <div class="cmp-prop"><span class="tag">Propuesta</span>Tablero público con indicadores agregados y mapa por zonas, alimentado del mismo sistema, sin datos personales.</div>
+      </div>
+    </div>
+
+    <h2 style="margin-top:44px">Ruta de implementación sugerida</h2>
+    <div class="fase">
+      <span class="f-n">Fase 1 · 2–3 semanas</span>
+      <h3>Consulta de folio + nuevo asistente de reporte</h3>
+      <p>Se construye sobre el formulario y la base de Tactica ya en operación: una página pública que lee el estatus por folio (con extracción de folios dobles vía expresión regular) y el asistente en 4 pasos como nueva portada de matamoros.gob.mx/rigo. El selector usa el catálogo oficial de 27 eventualidades con sus códigos y el pin Leaflet agrega latitud/longitud a cada reporte, dato que hoy no siempre llega preciso a las cuadrillas.</p>
+    </div>
+    <div class="fase">
+      <span class="f-n">Fase 2 · 4–6 semanas</span>
+      <h3>Notificaciones bidireccionales por WhatsApp</h3>
+      <p>Plantillas de utilidad sobre la API oficial de Meta con el número RIGO existente: confirmación de folio, cambios de estatus y encuesta al cierre. Verificar el esquema de precios de Meta vigente desde octubre de 2026 antes de contratar el BSP.</p>
+    </div>
+    <div class="fase">
+      <span class="f-n">Fase 3 · continuo</span>
+      <h3>Tablero público y ciclo de calidad</h3>
+      <p>Indicadores agregados, mapa por zonas con el molde Leaflet ya probado en los tableros de facilitadores, encuesta de satisfacción y reapertura conectadas a la bitácora de Rigo Plus.</p>
+    </div>
+
+    <div class="nota-tec">
+      <b>Nota técnica.</b> El tablero de mando actual no se toca: esta capa solo consume sus datos (folio, estatus, área, zona) mediante una vista de solo lectura o exportación programada. La sincronización RIGO ↔ app de campo mantiene a RIGO como fuente autoritativa de cierres, como ya se definió en el conciliador. Accesibilidad objetivo: WCAG 2.1 AA, navegable por teclado y con foco visible. Los textos de "dirección responsable" por eventualidad ya existen en el formulario actual (cada opción los autocompleta): basta copiarlos una vez al catálogo de este prototipo — aquí se incluye el de Bache Superficial como muestra. Con la capa INE de colonias ya disponible en el proyecto, las coordenadas del pin (o la ubicación compartida por WhatsApp) permiten derivar colonia y zona por punto-en-polígono y asignar automáticamente al facilitador correcto.
+    </div>
+  </section>
+</div>
+
+</main>
+
+<footer>
+  <div class="foot-inner">
+    <div>
+      <div class="logo">RIGO<span>+</span></div>
+      <p style="margin-top:10px;max-width:34ch">Sexta S/N, González y Morelos, Centro<br>Heroica Matamoros, Tamaulipas, México</p>
+    </div>
+    <div>
+      <h4>Gobierno</h4>
+      <ul>
+        <li><a href="https://matamoros.gob.mx/directorio-municipal/" target="_blank" rel="noopener">Directorio municipal</a></li>
+        <li><a href="https://transparencia.matamoros.gob.mx/" target="_blank" rel="noopener">Transparencia</a></li>
+        <li><a href="https://matamoros.gob.mx/aviso-de-privacidad/" target="_blank" rel="noopener">Aviso de privacidad</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Atención ciudadana</h4>
+      <ul>
+        <li><a href="tel:+528688108000">Tel. (868) 810 8000</a></li>
+        <li><a href="https://wa.me/528689800960" target="_blank" rel="noopener">WhatsApp (868) 980 0960</a></li>
+        <li><a href="mailto:contacto@matamoros.gob.mx">contacto@matamoros.gob.mx</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot-legal">
+    <span>Gobierno Municipal de Matamoros, Tamaulipas</span>
+    <span>Prototipo de propuesta · Buen Gobierno · 2026</span>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ================= Navegación entre vistas ================= */
+function ir(v){
+  document.querySelectorAll('.view').forEach(function(el){el.classList.remove('active')});
+  var destino=document.getElementById('v-'+v);
+  if(destino){destino.classList.add('active')}
+  document.querySelectorAll('.vista-btn').forEach(function(b){
+    if(b.dataset.v===v){b.setAttribute('aria-current','page')}
+    else{b.removeAttribute('aria-current')}
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ================= Asistente de reporte ================= */
+var paso=1;
+var seleccion=null; /* {n:nombre, c:codigo, g:familia} */
+
+/* Catálogo oficial RIGO: 27 eventualidades, códigos intactos del sistema Tactica */
+var CATALOGO=[
+  {g:'Baches y vialidades',ico:'🕳️',items:[['Bache Superficial','BAS'],['Baches Profundos','BAP'],['Semáforos','SEM'],['Señalamientos Viales','SEV']]},
+  {g:'Alumbrado público',ico:'💡',items:[['Lámpara Fundida','LAF'],['Lámpara Prende y Apaga','LPA'],['Lámpara Prendida 24hrs.','LPR'],['Lámpara Colgando','LCO'],['Sector Apagado','SEA']]},
+  {g:'Agua y drenaje',ico:'💧',items:[['Fuga de Agua','FDA'],['Fuga de Drenaje','FDE'],['Alcantarilla Abierta','AAB']]},
+  {g:'Basura y limpieza',ico:'🗑️',items:[['Recolección de Basura','RBA'],['Basurero Clandestino','BSC'],['Recolección de Ramas','RER'],['Animales en Descomposición','ADS']]},
+  {g:'Parques y áreas verdes',ico:'🌳',items:[['Limpieza Áreas Verdes','LAV'],['Camellones','CAM'],['Rehabilitación de Parques y Juegos','RPJ'],['Poda de Árboles en Vía Publica','AVP']]},
+  {g:'Postes y cableado',ico:'⚡',items:[['Poste Caído','PCA'],['Cable Caído','CAC'],['Cables Expuestos','CAE'],['Servicio Caído','SCA']]},
+  {g:'Convivencia y vía pública',ico:'🏘️',items:[['Autos Abandonados en la Vía Pública','ABV'],['Atención y Maltrato Animal','AMA'],['Ruido Excesivo','REX']]}
+];
+
+/* Dirección responsable por eventualidad (texto oficial del formulario actual; BAS como muestra) */
+var RESPONSABLES={
+  BAS:'Servicio de Bache Superficial a cargo de la Dirección de Mantenimiento y Conservación Urbana de la Secretaría de Desarrollo Urbano y Ecología.'
+};
+
+function norm(t){return t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
+
+function pintarCatalogo(filtro){
+  var cont=document.getElementById('grupos-cats');
+  cont.innerHTML='';
+  var q=filtro?norm(filtro):'';
+  var visibles=0;
+  CATALOGO.forEach(function(fam){
+    var items=fam.items.filter(function(it){
+      return !q || norm(it[0]).indexOf(q)>=0 || norm(it[1]).indexOf(q)>=0;
+    });
+    if(q && items.length===0){return}
+    visibles+=items.length;
+    var g=document.createElement('div');
+    g.className='grupo'+(q?' abierta':'');
+    var cab=document.createElement('button');
+    cab.type='button';cab.className='grupo-cab';
+    cab.setAttribute('aria-expanded', q?'true':'false');
+    cab.innerHTML='<span class="ico">'+fam.ico+'</span><span>'+fam.g+'</span>'
+      +'<span class="cuenta">'+items.length+'</span><span class="caret">▾</span>';
+    cab.addEventListener('click',function(){
+      g.classList.toggle('abierta');
+      cab.setAttribute('aria-expanded', g.classList.contains('abierta')?'true':'false');
+    });
+    g.appendChild(cab);
+    var ch=document.createElement('div');ch.className='chips';
+    items.forEach(function(it){
+      var b=document.createElement('button');
+      b.type='button';b.className='evento-chip';
+      if(seleccion && seleccion.c===it[1]){b.classList.add('sel');g.classList.add('abierta');cab.setAttribute('aria-expanded','true')}
+      b.innerHTML='<span>'+it[0]+'</span><span class="cod">'+it[1]+'</span>';
+      b.addEventListener('click',function(){elegirEvento(it[0],it[1],fam.g)});
+      ch.appendChild(b);
+    });
+    g.appendChild(ch);
+    cont.appendChild(g);
+  });
+  document.getElementById('sin-result').style.display=(q && visibles===0)?'block':'none';
+}
+
+function elegirEvento(n,c,g){
+  seleccion={n:n,c:c,g:g};
+  document.querySelectorAll('.evento-chip').forEach(function(b){
+    b.classList.toggle('sel', b.querySelector('.cod').textContent===c);
+  });
+  document.getElementById('sel-actual-txt').textContent=n+' ('+c+') · '+g;
+  document.getElementById('sel-resp').textContent = RESPONSABLES[c] || 'Aquí se mostrará la dirección municipal responsable, según el catálogo oficial RIGO.';
+  document.getElementById('sel-actual').classList.add('on');
+  actualizarBotones();
+}
+
+document.getElementById('buscar-evento').addEventListener('input',function(){
+  pintarCatalogo(this.value.trim());
+});
+pintarCatalogo('');
+
+/* ---------- Mapa Leaflet: pin exacto del reporte ---------- */
+var mapa=null,pin=null,puntoSel=null,precisionM=null,dirDetectada='',circPrec=null;
+var CENTRO_MTM=[25.8690,-97.5027];
+var LIMITES_MTM=L.latLngBounds([[25.50,-97.95],[26.10,-97.10]]);
+
+function initMapa(){
+  if(mapa){setTimeout(function(){mapa.invalidateSize()},80);return}
+  mapa=L.map('mapa').setView(CENTRO_MTM,13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+  }).addTo(mapa);
+  var icono=L.divIcon({className:'pin-wrap',html:'<div class="pin-rigo"></div>',iconSize:[30,42],iconAnchor:[15,36]});
+  pin=L.marker(CENTRO_MTM,{draggable:true,icon:icono,keyboard:true,title:'Arrastra el pin al punto exacto'}).addTo(mapa);
+  pin.on('dragend',function(){fijarPunto(pin.getLatLng())});
+  mapa.on('click',function(e){
+    if(mapa.getZoom()<16){
+      mapa.setView(e.latlng, Math.min(17, mapa.getZoom()+3));
+      var c=document.getElementById('coords');
+      c.classList.remove('ok');
+      c.textContent='🔎 Acércate un poco más y vuelve a tocar el punto exacto (el pin solo se fija con zoom de calle)';
+      return;
+    }
+    pin.setLatLng(e.latlng);
+    fijarPunto(e.latlng);
+  });
+  setTimeout(function(){mapa.invalidateSize()},80);
+}
+
+function fijarPunto(ll, precision){
+  puntoSel=ll;
+  precisionM=precision||null;
+  var c=document.getElementById('coords');
+  if(!LIMITES_MTM.contains(ll)){
+    c.classList.remove('ok');
+    c.textContent='⚠️ '+ll.lat.toFixed(5)+', '+ll.lng.toFixed(5)+' — este punto parece estar fuera del municipio; revísalo';
+  }else{
+    c.textContent='📍 '+ll.lat.toFixed(5)+', '+ll.lng.toFixed(5)+(precision?(' (±'+Math.round(precision)+' m)'):'')+' — punto fijado';
+    c.classList.add('ok');
+  }
+  geoInversa(ll);
+}
+
+/* Verificación inversa: el sistema le confirma al ciudadano qué dirección cae bajo el pin */
+function geoInversa(ll){
+  var box=document.getElementById('dir-detectada');
+  box.textContent='Verificando la dirección del punto…';
+  fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1&lat='+ll.lat+'&lon='+ll.lng)
+    .then(function(r){return r.json()})
+    .then(function(d){
+      var a=d.address||{};
+      var calle=[a.road,a.house_number].filter(Boolean).join(' ');
+      var colDet=a.neighbourhood||a.suburb||a.residential||a.quarter||'';
+      dirDetectada=[calle,colDet].filter(Boolean).join(', ');
+      if(!dirDetectada){
+        box.textContent='No hay dirección registrada en este punto; se enviarán las coordenadas exactas.';
+        return;
+      }
+      box.innerHTML='✔️ Dirección detectada bajo el pin: <b>'+dirDetectada+'</b>. Confírmala o mueve el pin.';
+      sugerirColonia(colDet, box);
+    })
+    .catch(function(){
+      box.textContent='Sin conexión para verificar la dirección; se enviarán las coordenadas exactas.';
+    });
+}
+
+/* Cruce pin ↔ colonia elegida (en producción: punto-en-polígono con la capa oficial de 485 colonias) */
+function sugerirColonia(colDet, box){
+  if(!colDet){return}
+  var sel=document.getElementById('colonia');
+  var det=norm(colDet).replace(/^colonia /,'');
+  var op=null;
+  for(var i=0;i<sel.options.length;i++){
+    if(sel.options[i].value && norm(sel.options[i].text)===det){op=sel.options[i];break}
+  }
+  if(op && sel.value===''){
+    sel.value=op.text;
+    box.innerHTML+=' · Colonia seleccionada automáticamente: <b>'+op.text+'</b>.';
+  }else if(op && sel.value!==op.text){
+    var b=document.createElement('button');
+    b.type='button';
+    b.className='btn btn-mini btn-borde';
+    b.style.cssText='margin-left:8px;padding:4px 12px;font-size:.72rem;vertical-align:middle';
+    b.textContent='Usar colonia '+op.text;
+    b.addEventListener('click',function(){
+      sel.value=op.text;
+      box.innerHTML='✔️ Dirección detectada bajo el pin: <b>'+dirDetectada+'</b> · Colonia ajustada a <b>'+op.text+'</b>.';
+    });
+    box.appendChild(b);
+  }else if(!op && sel.value){
+    var noteEl=document.createElement('span');
+    noteEl.style.color='var(--ambar)';
+    noteEl.textContent=' El mapa sugiere "'+colDet+'" y tú elegiste "'+sel.value+'": revisa cuál es la correcta.';
+    box.appendChild(noteEl);
+  }
+}
+
+function buscarDireccion(){
+  var calle=document.getElementById('calle').value.trim();
+  var col=document.getElementById('colonia').value;
+  var msg=document.getElementById('dir-msg');
+  if(!calle){msg.textContent='Escribe primero la calle o el cruce.';return}
+  msg.textContent='Buscando en el mapa…';
+  initMapa();
+  var q=encodeURIComponent(calle+(col?(', '+col):'')+', Matamoros, Tamaulipas, México');
+  fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&bounded=1&viewbox=-97.62,25.95,-97.40,25.74&q='+q)
+    .then(function(r){return r.json()})
+    .then(function(res){
+      if(res && res.length){
+        var ll=L.latLng(parseFloat(res[0].lat),parseFloat(res[0].lon));
+        mapa.setView(ll,17);
+        pin.setLatLng(ll);
+        fijarPunto(ll);
+        msg.textContent='Dirección ubicada. Ajusta el pin al punto exacto si hace falta.';
+      }else{
+        msg.textContent='No se encontró esa dirección; afina el texto o coloca el pin a mano.';
+      }
+    })
+    .catch(function(){
+      msg.textContent='Sin conexión con el buscador de direcciones; coloca el pin a mano.';
+    });
+}
+
+function usarUbicacion(){
+  var msg=document.getElementById('geo-msg');
+  if(!('geolocation' in navigator)){
+    msg.textContent='Tu navegador no permite geolocalización; coloca el pin directamente en el mapa.';
+    return;
+  }
+  msg.textContent='Buscando tu ubicación…';
+  msg.style.color='var(--tinta-2)';
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var ll=L.latLng(pos.coords.latitude,pos.coords.longitude);
+    var acc=pos.coords.accuracy||0;
+    initMapa();
+    mapa.setView(ll, acc>60?15:17);
+    pin.setLatLng(ll);
+    if(circPrec){mapa.removeLayer(circPrec)}
+    circPrec=L.circle(ll,{radius:Math.max(acc,10),color:'#B67A1C',weight:1.5,fillColor:'#B67A1C',fillOpacity:.12}).addTo(mapa);
+    fijarPunto(ll, acc);
+    if(acc>40){
+      msg.textContent='Tu GPS tiene un margen de ±'+Math.round(acc)+' m (círculo ámbar): arrastra el pin al punto exacto.';
+      msg.style.color='var(--ambar)';
+    }else{
+      msg.textContent='Ubicación detectada con buena precisión. Ajusta el pin si hace falta.';
+      msg.style.color='var(--verde)';
+    }
+  },function(){
+    msg.textContent='No se pudo obtener tu ubicación (permiso denegado o sin señal). Coloca el pin en el mapa.';
+    msg.style.color='var(--ambar)';
+  },{enableHighAccuracy:true,timeout:10000});
+}
+
+/* ---------- Flujo del asistente ---------- */
+function mostrarPaso(n){
+  paso=n;
+  document.querySelectorAll('.wz-panel').forEach(function(p){
+    p.classList.toggle('act', p.dataset.p==String(n));
+  });
+  document.querySelectorAll('.wz-step').forEach(function(s){
+    var sn=parseInt(s.dataset.s,10);
+    s.classList.toggle('act', sn===n);
+    s.classList.toggle('done', sn<n);
+  });
+  if(n===2){setTimeout(initMapa,60)}
+  if(n===4){llenarResumen()}
+  if(n===5){
+    document.getElementById('tk-evento').textContent = seleccion ? (seleccion.n+' ('+seleccion.c+') · '+seleccion.g) : '';
+  }
+  var foot=document.getElementById('wz-foot');
+  if(n===5){foot.classList.add('oculto')}else{foot.classList.remove('oculto')}
+  actualizarBotones();
+  document.getElementById('wizard').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function actualizarBotones(){
+  var atras=document.getElementById('btn-atras');
+  var sig=document.getElementById('btn-sig');
+  atras.disabled=(paso<=1);
+  if(paso===1){
+    sig.disabled=(seleccion===null);
+    sig.textContent='Continuar →';
+  }else if(paso===4){
+    sig.disabled=false;
+    sig.textContent='Enviar reporte';
+  }else{
+    sig.disabled=false;
+    sig.textContent='Continuar →';
+  }
+}
+
+function pasoSiguiente(){
+  if(paso===4){
+    var priv=document.getElementById('priv');
+    if(!priv.checked){
+      priv.focus();
+      priv.closest('.check').style.color='var(--rojo)';
+      return;
+    }
+    mostrarPaso(5);
+    return;
+  }
+  if(paso<4){mostrarPaso(paso+1)}
+}
+
+function pasoAnterior(){
+  if(paso>1 && paso<5){mostrarPaso(paso-1)}
+}
+
+function llenarResumen(){
+  var col=document.getElementById('colonia').value || 'Colonia por definir';
+  var calle=document.getElementById('calle').value;
+  document.getElementById('r-cat').textContent = seleccion ? (seleccion.n+' ('+seleccion.c+') · '+seleccion.g) : '—';
+  document.getElementById('r-ubi').textContent = col+(calle?(' · '+calle):'');
+  document.getElementById('r-geo').textContent = puntoSel ? (puntoSel.lat.toFixed(5)+', '+puntoSel.lng.toFixed(5)+(precisionM?(' (±'+Math.round(precisionM)+' m)'):'')) : 'Pin sin colocar (opcional pero recomendado)';
+  document.getElementById('r-dir').textContent = puntoSel ? (dirDetectada || 'Sin dirección registrada en el punto; van las coordenadas') : '—';
+}
+
+/* ================= Folio: copiar y ver ================= */
+function copiarFolio(){
+  var folio=document.getElementById('folio-nuevo').textContent.trim();
+  var msg=document.getElementById('copiado-msg');
+  function listo(){msg.textContent='Folio copiado al portapapeles ✓'}
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(folio).then(listo,listo);
+  }else{listo()}
+}
+
+function verMiFolio(){
+  var folio=document.getElementById('folio-nuevo').textContent.trim();
+  document.getElementById('folio-input').value=folio;
+  ir('consultar');
+  consultarFolio();
+}
+
+/* ================= Consulta de folio (demo) ================= */
+function consultarFolio(){
+  var input=document.getElementById('folio-input');
+  var valor=input.value.trim();
+  if(valor===''){valor='RIGO-2026-004521';input.value=valor}
+  document.getElementById('rf-folio').textContent=valor.toUpperCase();
+  document.getElementById('resultado-folio').classList.remove('oculto');
+}
+
+/* ================= Encuesta y reapertura ================= */
+document.querySelectorAll('#estrellas .estrella').forEach(function(e){
+  e.addEventListener('click',function(){
+    var n=parseInt(e.dataset.n,10);
+    document.querySelectorAll('#estrellas .estrella').forEach(function(s){
+      s.classList.toggle('on', parseInt(s.dataset.n,10)<=n);
+    });
+    document.getElementById('gracias-msg').classList.remove('oculto');
+  });
+});
+
+function reabrir(){
+  document.getElementById('reabierto-msg').classList.remove('oculto');
+}
+</script>
+</body>
+</html>
