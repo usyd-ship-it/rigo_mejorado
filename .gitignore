@@ -1,1 +1,12 @@
 .DS_Store
+
+# secretos / entornos — nunca commitear
+.env
+.env.local
+.env.*.local
+apps/*/.env
+apps/*/.env.local
+apps/*/.env.*.local
+node_modules/
+.next/
+dist/

@@ -1,0 +1,13 @@
+{
+  "name": "rigo-mejorado",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:portal": "npm run dev -w apps/portal",
+    "dev:mando": "npm run dev -w apps/mando",
+    "dev:api": "npm run dev -w apps/api"
+  }
+}
