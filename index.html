@@ -519,7 +519,7 @@ footer li{margin-bottom:7px}
 </head>
 <body>
 
-<div class="cinta-demo"><strong>Prototipo navegable</strong> · Propuesta de mejora para RIGO · Los datos mostrados son de demostración</div>
+<div class="cinta-demo"><strong>Prototipo navegable · v0.2</strong> · Propuesta de mejora para RIGO · Pin obligatorio y colonia derivada conforme al spec · Datos de demostración</div>
 
 <header class="top">
   <div class="top-inner">
@@ -666,7 +666,7 @@ footer li{margin-bottom:7px}
           <h3>¿Dónde está el problema?</h3>
           <div class="fila-2" style="margin-top:14px">
             <div class="field">
-              <label for="colonia">Colonia</label>
+              <label for="colonia">Colonia (se confirma con el pin)</label>
               <select id="colonia">
                 <option value="">Selecciona tu colonia…</option>
                 <option>Centro</option>
@@ -680,7 +680,7 @@ footer li{margin-bottom:7px}
                 <option>Tecnológico</option>
                 <option>Victoria</option>
               </select>
-              <div class="ayuda">Catálogo oficial de 485 colonias, con búsqueda por texto en la versión final.</div>
+              <div class="ayuda">Catálogo oficial de 485 colonias. En producción la colonia se deriva sola del pin (punto-en-polígono); tu selección solo la confirma.</div>
             </div>
             <div class="field">
               <label for="calle">Calle y número (o entre calles)</label>
@@ -700,7 +700,7 @@ footer li{margin-bottom:7px}
             <div class="ayuda" style="margin:0 0 8px">Toca el mapa o arrastra el pin guinda. La cuadrilla llega directo, sin buscar.</div>
           </div>
           <div id="mapa" role="application" aria-label="Mapa para ubicar el reporte"></div>
-          <div class="coords" id="coords">📍 Pin sin colocar — toca el mapa para fijar el punto</div>
+          <div class="coords" id="coords">📍 Pin obligatorio — toca el mapa para fijar el punto exacto; es la fuente de verdad de la ubicación</div>
           <div class="dir-inversa" id="dir-detectada"></div>
           <button class="btn btn-mini btn-borde" style="margin-top:12px" onclick="usarUbicacion()">📍 Usar mi ubicación actual</button>
           <span id="geo-msg" style="display:block;font-size:.78rem;color:var(--tinta-2);margin-top:8px"></span>
@@ -966,7 +966,7 @@ footer li{margin-bottom:7px}
       <div class="cmp-row">
         <div class="cmp-tema">Formato de folio</div>
         <div class="cmp-hoy"><span class="tag">Hoy</span>Folios numéricos que a veces se renumeran y aparecen dobles: "actual (anterior)", lo que rompe búsquedas exactas.</div>
-        <div class="cmp-prop"><span class="tag">Propuesta</span>Folio legible y estable RIGO-AAAA-000000; la consulta reconoce también los folios del formato anterior.</div>
+        <div class="cmp-prop"><span class="tag">Propuesta</span>Folio legible y estable RIGO-AAAA-000000 como capa de presentación sobre un ID interno inmutable que nunca cambia; la consulta reconoce también los folios del formato anterior, incluidos los dobles.</div>
       </div>
       <div class="cmp-row">
         <div class="cmp-tema">Notificaciones</div>
@@ -1180,6 +1180,7 @@ function fijarPunto(ll, precision){
     c.classList.add('ok');
   }
   geoInversa(ll);
+  actualizarBotones();
 }
 
 /* Verificación inversa: el sistema le confirma al ciudadano qué dirección cae bajo el pin */
@@ -1321,6 +1322,9 @@ function actualizarBotones(){
   if(paso===1){
     sig.disabled=(seleccion===null);
     sig.textContent='Continuar →';
+  }else if(paso===2){
+    sig.disabled=(puntoSel===null);
+    sig.textContent=puntoSel?'Continuar →':'Coloca el pin para continuar';
   }else if(paso===4){
     sig.disabled=false;
     sig.textContent='Enviar reporte';
@@ -1353,7 +1357,7 @@ function llenarResumen(){
   var calle=document.getElementById('calle').value;
   document.getElementById('r-cat').textContent = seleccion ? (seleccion.n+' ('+seleccion.c+') · '+seleccion.g) : '—';
   document.getElementById('r-ubi').textContent = col+(calle?(' · '+calle):'');
-  document.getElementById('r-geo').textContent = puntoSel ? (puntoSel.lat.toFixed(5)+', '+puntoSel.lng.toFixed(5)+(precisionM?(' (±'+Math.round(precisionM)+' m)'):'')) : 'Pin sin colocar (opcional pero recomendado)';
+  document.getElementById('r-geo').textContent = puntoSel ? (puntoSel.lat.toFixed(5)+', '+puntoSel.lng.toFixed(5)+(precisionM?(' (±'+Math.round(precisionM)+' m)'):'')) : '—';
   document.getElementById('r-dir').textContent = puntoSel ? (dirDetectada || 'Sin dirección registrada en el punto; van las coordenadas') : '—';
 }
 

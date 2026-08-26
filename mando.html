@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RIGO+ Mando — Propuesta de tablero operativo · Matamoros</title>
+<meta name="description" content="Prototipo del tablero interno de gestión de reportes RIGO+: mapa operativo, expedientes con bitácora, enum de estatus y contrato de datos para Buen Gobierno.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* ============================================================
+   RIGO+ MANDO — tablero operativo interno
+   Misma familia visual del portal ciudadano, en clave de sala
+   de mando: cromo oscuro, contenido claro, datos en mono.
+   ============================================================ */
+:root{
+  --guinda:#7A1F2B; --guinda-2:#5C1420; --guinda-3:#93293A;
+  --oro:#C2953A; --oro-suave:#F3E7CB;
+  --papel:#F5F2EC; --blanco:#FFFFFF;
+  --tinta:#241A1E; --tinta-suave:#38292E; --tinta-2:#6F5E63; --linea:#E4DCD2;
+  --cromo-txt:#D9C9CC; --cromo-txt-2:#9C868B;
+  /* Semáforo de estatus (enum controlado) */
+  --e-recibido:#6F5E63; --e-clasificado:#C2953A; --e-atencion:#B67A1C;
+  --e-espera:#7C6A93; --e-resuelto:#2E7D4F; --e-cerrado:#1F5A38;
+  --e-reabierto:#B3392E; --e-improcedente:#9C8D8F;
+  --radio:12px;
+  --sombra:0 1px 2px rgba(36,26,30,.06), 0 8px 22px rgba(36,26,30,.08);
+  --transicion:170ms ease;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Public Sans',system-ui,sans-serif;background:var(--papel);color:var(--tinta);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer}
+a{color:var(--guinda)}
+:focus-visible{outline:3px solid var(--oro);outline-offset:2px;border-radius:4px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+
+.cinta{background:var(--tinta);color:#EFE7DA;font-family:'IBM Plex Mono',monospace;font-size:.7rem;letter-spacing:.06em;text-align:center;padding:6px 14px;text-transform:uppercase}
+.cinta strong{color:var(--oro)}
+
+/* ---------- Estructura: sidebar + contenido ---------- */
+.app{display:grid;grid-template-columns:230px 1fr;min-height:100vh}
+aside.lado{
+  background:var(--tinta);color:var(--cromo-txt);
+  display:flex;flex-direction:column;padding:20px 14px;gap:4px;
+  position:sticky;top:0;height:100vh;
+}
+.marca{display:flex;flex-direction:column;gap:2px;padding:4px 10px 18px;border-bottom:1px solid var(--tinta-suave);margin-bottom:14px}
+.marca .logo{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.35rem;color:#fff;letter-spacing:.01em}
+.marca .logo span{color:var(--oro)}
+.marca .sub{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--cromo-txt-2)}
+.nav-btn{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+  background:none;border:none;color:var(--cromo-txt);font-weight:600;font-size:.88rem;
+  padding:11px 12px;border-radius:9px;transition:var(--transicion);
+}
+.nav-btn .cnt{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:.66rem;background:var(--tinta-suave);border-radius:999px;padding:2px 8px;color:var(--cromo-txt-2)}
+.nav-btn:hover{background:var(--tinta-suave);color:#fff}
+.nav-btn[aria-current="page"]{background:var(--guinda);color:#fff}
+.nav-btn[aria-current="page"] .cnt{background:rgba(255,255,255,.18);color:#F3E7CB}
+.lado-pie{margin-top:auto;padding:12px 10px 4px;border-top:1px solid var(--tinta-suave);font-size:.68rem;color:var(--cromo-txt-2);line-height:1.6}
+.lado-pie b{color:var(--cromo-txt)}
+
+/* ---------- Barra superior ---------- */
+.contenido{display:flex;flex-direction:column;min-width:0}
+.topbar{
+  background:var(--blanco);border-bottom:1px solid var(--linea);
+  display:flex;align-items:center;gap:12px;padding:12px 22px;
+  position:sticky;top:0;z-index:40;flex-wrap:wrap;
+}
+.topbar h1{font-family:'Archivo',sans-serif;font-weight:800;font-size:1.05rem;margin-right:auto}
+.busca{display:flex;gap:8px;align-items:center}
+.busca input{
+  width:min(300px,60vw);padding:9px 13px;border:1.5px solid var(--linea);border-radius:9px;
+  font-family:'IBM Plex Mono',monospace;font-size:.82rem;background:var(--papel);
+}
+.busca input:focus{border-color:var(--guinda);outline:none;box-shadow:0 0 0 3px rgba(122,31,43,.1)}
+.busca-nota{width:100%;font-size:.72rem;color:var(--e-reabierto);display:none}
+
+main{padding:22px;max-width:1240px;width:100%}
+.view{display:none}
+.view.active{display:block;animation:aparecer .25s ease}
+@keyframes aparecer{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.sec-cab{display:flex;align-items:baseline;gap:12px;margin:26px 0 12px;flex-wrap:wrap}
+.sec-cab h2{font-family:'Archivo',sans-serif;font-weight:800;font-size:1.15rem}
+.sec-cab .mini{font-size:.78rem;color:var(--tinta-2)}
+.lead{color:var(--tinta-2);font-size:.9rem;max-width:74ch}
+
+/* ---------- Botones ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:999px;font-weight:700;font-size:.82rem;padding:9px 18px;border:2px solid transparent;transition:var(--transicion);text-decoration:none}
+.btn-primario{background:var(--guinda);color:#fff}
+.btn-primario:hover{background:var(--guinda-3)}
+.btn-borde{background:transparent;color:var(--guinda);border-color:var(--guinda)}
+.btn-borde:hover{background:var(--guinda);color:#fff}
+.btn-mini{padding:6px 13px;font-size:.74rem}
+.btn-fantasma{background:transparent;color:var(--tinta-2);border:1.5px solid var(--linea)}
+.btn-fantasma:hover{border-color:var(--guinda);color:var(--guinda)}
+
+/* ---------- KPIs ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{background:var(--blanco);border:1px solid var(--linea);border-radius:var(--radio);padding:14px 16px;box-shadow:var(--sombra)}
+.kpi .num{font-family:'Archivo',sans-serif;font-weight:900;font-size:1.7rem;line-height:1.05;font-variant-numeric:tabular-nums}
+.kpi .lbl{font-size:.7rem;color:var(--tinta-2);text-transform:uppercase;letter-spacing:.05em;margin-top:3px}
+.kpi.alerta .num{color:var(--e-reabierto)}
+.kpi.ok .num{color:var(--e-resuelto)}
+
+/* ---------- Tarjetas ---------- */
+.card{background:var(--blanco);border:1px solid var(--linea);border-radius:var(--radio);padding:18px;box-shadow:var(--sombra)}
+.grid{display:grid;gap:14px}
+.grid-3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.card h3{font-family:'Archivo',sans-serif;font-weight:700;font-size:.95rem;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.card h3 .pastilla{font-family:'IBM Plex Mono',monospace;font-size:.62rem;background:var(--papel);border:1px solid var(--linea);border-radius:999px;padding:2px 9px;color:var(--tinta-2);font-weight:500}
+
+/* ---------- Chips de estatus (enum) ---------- */
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;font-size:.68rem;font-weight:700;padding:3px 10px;white-space:nowrap}
+.chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+.c-recibido{background:#EFEAE4;color:var(--e-recibido)}
+.c-clasificado{background:var(--oro-suave);color:#8A6516}
+.c-en_atencion{background:#F7ECD8;color:var(--e-atencion)}
+.c-en_espera{background:#EDE8F3;color:var(--e-espera)}
+.c-resuelto{background:#E3F0E8;color:var(--e-resuelto)}
+.c-cerrado{background:#DCEAE0;color:var(--e-cerrado)}
+.c-reabierto{background:#F6E3E1;color:var(--e-reabierto)}
+.c-improcedente{background:#ECE7E8;color:var(--e-improcedente);text-decoration:line-through}
+.punto-edad{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+/* ---------- Lista de críticos y deuda ---------- */
+.fila-critico{display:flex;align-items:center;gap:10px;padding:10px 4px;border-top:1px solid var(--linea);font-size:.84rem;flex-wrap:wrap}
+.fila-critico:first-of-type{border-top:none}
+.fila-critico .fol{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--guinda);font-size:.76rem}
+.fila-critico .abrir{margin-left:auto}
+.deuda li{list-style:none;display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--linea);font-size:.84rem}
+.deuda li:first-child{border-top:none}
+.deuda .ic{flex-shrink:0}
+.deuda b{font-weight:700}
+.deuda small{display:block;color:var(--tinta-2)}
+
+/* Barras de antigüedad / familia */
+.barra{margin-top:10px}
+.barra .b-lbl{display:flex;justify-content:space-between;font-size:.78rem;font-weight:600;margin-bottom:4px}
+.barra .b-lbl span:last-child{font-family:'IBM Plex Mono',monospace;color:var(--tinta-2);font-weight:500}
+.b-track{height:10px;background:#EDE8E0;border-radius:999px;overflow:hidden}
+.b-fill{height:100%;border-radius:999px}
+
+/* ---------- Filtros ---------- */
+.filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0 14px}
+.f-chip{border:1.5px solid var(--linea);background:var(--blanco);border-radius:999px;padding:6px 14px;font-size:.76rem;font-weight:600;color:var(--tinta-2);transition:var(--transicion)}
+.f-chip:hover{border-color:var(--oro)}
+.f-chip[aria-pressed="true"]{background:var(--guinda);border-color:var(--guinda);color:#fff}
+.filtros select{padding:7px 10px;border:1.5px solid var(--linea);border-radius:9px;font:inherit;font-size:.78rem;background:var(--blanco)}
+.f-sep{width:1px;height:22px;background:var(--linea)}
+
+/* ---------- Tabla de reportes ---------- */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--linea);border-radius:var(--radio);background:var(--blanco);box-shadow:var(--sombra)}
+table{border-collapse:collapse;width:100%;font-size:.8rem;min-width:860px}
+th{background:var(--tinta);color:#EFE7DA;text-align:left;padding:9px 12px;font-family:'Archivo',sans-serif;font-weight:700;font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}
+td{padding:9px 12px;border-top:1px solid var(--linea);vertical-align:middle}
+tbody tr{cursor:pointer;transition:var(--transicion)}
+tbody tr:hover{background:#FBF8F2}
+.t-folio{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--guinda);font-size:.74rem;white-space:nowrap}
+.t-folio small{display:block;color:var(--tinta-2);font-weight:400;font-size:.62rem}
+.t-ev b{display:block;font-size:.8rem}
+.t-ev span{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:var(--tinta-2)}
+.t-col .disc{color:var(--e-atencion);font-size:.72rem;cursor:help}
+.t-num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.vacio{padding:26px;text-align:center;color:var(--tinta-2);font-size:.85rem}
+
+/* ---------- Drawer expediente ---------- */
+.velo{position:fixed;inset:0;background:rgba(36,26,30,.45);z-index:70;opacity:0;pointer-events:none;transition:opacity .2s ease}
+.velo.on{opacity:1;pointer-events:auto}
+.drawer{
+  position:fixed;top:0;right:0;height:100vh;width:min(500px,100vw);
+  background:var(--papel);z-index:80;box-shadow:-12px 0 34px rgba(36,26,30,.3);
+  transform:translateX(102%);transition:transform .24s ease;
+  display:flex;flex-direction:column;
+}
+.drawer.on{transform:none}
+.dw-cab{background:var(--guinda);color:#fff;padding:16px 20px;display:flex;align-items:flex-start;gap:12px}
+.dw-cab .fol{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:1.05rem;letter-spacing:.02em}
+.dw-cab .id{font-family:'IBM Plex Mono',monospace;font-size:.62rem;color:#E8CFA0;display:block;margin-top:4px}
+.dw-cerrar{margin-left:auto;background:rgba(255,255,255,.14);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:1rem;flex-shrink:0}
+.dw-cerrar:hover{background:rgba(255,255,255,.28)}
+.dw-cuerpo{overflow-y:auto;padding:18px 20px 30px;display:flex;flex-direction:column;gap:14px}
+.dw-sec{background:var(--blanco);border:1px solid var(--linea);border-radius:var(--radio);padding:14px 16px}
+.dw-sec h4{font-family:'Archivo',sans-serif;font-weight:700;font-size:.8rem;margin-bottom:8px;color:var(--tinta);display:flex;align-items:center;gap:8px}
+.dw-datos{display:grid;grid-template-columns:1fr 1fr;gap:2px 14px;font-size:.82rem}
+.dw-datos dt{font-family:'IBM Plex Mono',monospace;font-size:.6rem;letter-spacing:.09em;text-transform:uppercase;color:var(--tinta-2);margin-top:8px}
+.dw-datos dd{font-weight:600}
+.aviso-disc{background:#F7ECD8;border:1px solid #E8D4AC;border-radius:9px;padding:10px 12px;font-size:.76rem;color:#7A5A14;margin-top:10px;line-height:1.55}
+.evid{display:flex;gap:8px}
+.evid .ph{flex:1;height:74px;border-radius:8px;border:1px solid var(--linea);background:linear-gradient(135deg,#EFE9DF,#E1D8C9);display:flex;align-items:center;justify-content:center;color:var(--tinta-2);font-size:.68rem}
+.contacto-oculto{font-family:'IBM Plex Mono',monospace;font-size:.84rem;letter-spacing:.04em}
+.nota-reg{font-size:.7rem;color:var(--tinta-2);margin-top:6px}
+.bitacora{list-style:none}
+.bitacora li{display:flex;gap:10px;padding:8px 0;border-top:1px dashed var(--linea);font-size:.78rem}
+.bitacora li:first-child{border-top:none}
+.bitacora time{font-family:'IBM Plex Mono',monospace;font-size:.64rem;color:var(--tinta-2);white-space:nowrap;padding-top:2px}
+.dw-acciones{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.dw-acciones select{padding:8px 10px;border:1.5px solid var(--linea);border-radius:9px;font:inherit;font-size:.78rem;background:#fff;flex:1;min-width:150px}
+
+/* ---------- Mapa ---------- */
+#mapaOps{height:min(62vh,560px);border-radius:var(--radio);border:1px solid var(--linea);box-shadow:var(--sombra);z-index:1}
+.leaflet-container{font-family:'Public Sans',sans-serif}
+.pop-fol{font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--guinda);font-size:.74rem}
+.mapa-nota{font-size:.74rem;color:var(--tinta-2);margin-top:8px}
+.leyenda{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:.7rem;color:var(--tinta-2)}
+.leyenda span{display:inline-flex;align-items:center;gap:5px}
+.leyenda i{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+/* ---------- Contrato de datos ---------- */
+pre.codigo{background:var(--tinta);color:#EFE7DA;border-radius:var(--radio);padding:16px;font-family:'IBM Plex Mono',monospace;font-size:.74rem;line-height:1.65;overflow-x:auto}
+pre.codigo .k{color:var(--oro)}
+pre.codigo .v{color:#A9D3B5}
+pre.codigo .c{color:#9C8D8F}
+.tbl-enum td:first-child{font-family:'IBM Plex Mono',monospace;font-size:.72rem;font-weight:600;color:var(--guinda)}
+.check-origen{list-style:none}
+.check-origen li{display:flex;gap:10px;padding:8px 0;border-top:1px solid var(--linea);font-size:.84rem}
+.check-origen li:first-child{border-top:none}
+.check-origen .ok{color:var(--e-resuelto);font-weight:800;flex-shrink:0}
+.check-origen small{display:block;color:var(--tinta-2)}
+
+/* ---------- Responsivo ---------- */
+@media(max-width:900px){
+  .app{grid-template-columns:1fr}
+  aside.lado{position:sticky;top:0;height:auto;flex-direction:row;align-items:center;gap:6px;padding:10px 12px;overflow-x:auto;z-index:50;scrollbar-width:none}
+  aside.lado::-webkit-scrollbar{display:none}
+  .marca{flex-direction:row;align-items:baseline;gap:8px;border-bottom:none;border-right:1px solid var(--tinta-suave);padding:0 14px 0 4px;margin:0}
+  .marca .sub{display:none}
+  .nav-btn{width:auto;white-space:nowrap;padding:8px 12px;font-size:.8rem}
+  .lado-pie{display:none}
+  main{padding:16px 14px}
+  .dw-datos{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="cinta"><strong>Prototipo interno · v2</strong> · Tablero de mando RIGO+ · Calibrado con las capturas del visor real (21 ago 2026) · Datos de demostración</div>
+
+<div class="app">
+
+<aside class="lado">
+  <div class="marca">
+    <span class="logo">RIGO<span>+</span> Mando</span>
+    <span class="sub">Mesa de control · Matamoros</span>
+  </div>
+  <button class="nav-btn" data-v="mando" aria-current="page" onclick="ir('mando')">📊 Resumen<span class="cnt" id="cnt-abiertos">—</span></button>
+  <button class="nav-btn" data-v="mapa" onclick="ir('mapa')">🗺️ Mapa operativo</button>
+  <button class="nav-btn" data-v="lista" onclick="ir('lista')">📋 Reportes<span class="cnt" id="cnt-total">—</span></button>
+  <button class="nav-btn" data-v="datos" onclick="ir('datos')">🔌 Contrato de datos</button>
+  <div class="lado-pie">
+    De filas a territorio: <b>el pin manda</b>, la colonia se calcula y el ID nunca cambia.<br>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:.6rem">spec 77 Studio · ago 2026</span>
+  </div>
+</aside>
+
+<div class="contenido">
+  <div class="topbar">
+    <h1 id="titulo-vista">Resumen operativo</h1>
+    <div class="busca">
+      <input type="text" id="q-folio" placeholder="Buscar folio (acepta formato viejo y doble)" aria-label="Buscar folio">
+      <button class="btn btn-primario btn-mini" onclick="buscarFolio()">Buscar</button>
+    </div>
+    <span class="busca-nota" id="busca-nota">No se encontró ese folio en los datos de demostración.</span>
+  </div>
+
+  <main>
+
+  <!-- ==================== RESUMEN ==================== -->
+  <div class="view active" id="v-mando">
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid grid-3" style="margin-top:16px">
+      <div class="card">
+        <h3>🔴 Críticos abiertos <span class="pastilla">CAC · CAE · PCA · AAB · FDE</span></h3>
+        <div id="lista-criticos"></div>
+      </div>
+      <div class="card">
+        <h3>⏱️ Antigüedad de lo abierto</h3>
+        <p class="mini" style="color:var(--tinta-2);font-size:.76rem">Días desde la creación. Lo que envejece sin moverse es lo primero que se revisa.</p>
+        <div id="barras-edad"></div>
+      </div>
+      <div class="card">
+        <h3>🧾 Deuda de datos <span class="pastilla">herencia RIGO</span></h3>
+        <ul class="deuda" id="lista-deuda"></ul>
+      </div>
+    </div>
+
+    <div class="grid grid-3" style="margin-top:14px">
+      <div class="card" style="grid-column:1/-1">
+        <h3>📈 Abiertos por familia</h3>
+        <div id="barras-familia" style="max-width:640px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MAPA ==================== -->
+  <div class="view" id="v-mapa">
+    <p class="lead">Cada punto es un reporte con coordenada verificada — la fuente de verdad de ubicación. El color es su estatus; el clic abre el expediente.</p>
+    <div class="filtros">
+      <button class="f-chip" aria-pressed="true" data-fm="abiertos" onclick="filtroMapa('abiertos',this)">Abiertos</button>
+      <button class="f-chip" aria-pressed="false" data-fm="resueltos" onclick="filtroMapa('resueltos',this)">Resueltos y cerrados</button>
+      <button class="f-chip" aria-pressed="false" data-fm="todos" onclick="filtroMapa('todos',this)">Todos</button>
+      <span class="f-sep"></span>
+      <button class="f-chip" aria-pressed="false" id="fm-criticos" onclick="toggleCriticosMapa(this)">Solo críticos</button>
+    </div>
+    <div id="mapaOps"></div>
+    <div class="leyenda" id="leyenda-mapa"></div>
+    <p class="mapa-nota" id="nota-sin-pin"></p>
+  </div>
+
+  <!-- ==================== LISTA ==================== -->
+  <div class="view" id="v-lista">
+    <p class="lead">La lista que el visor actual muestra como Excel, con lo que a un Excel le falta: estatus del enum, colonia calculada, alerta de discrepancia y antigüedad en semáforo. Clic en cualquier fila abre el expediente.</p>
+    <div class="filtros">
+      <select id="f-estatus" onchange="pintarTabla()" aria-label="Filtrar por estatus">
+        <option value="">Todos los estatus</option>
+      </select>
+      <select id="f-familia" onchange="pintarTabla()" aria-label="Filtrar por familia">
+        <option value="">Todas las familias</option>
+      </select>
+      <select id="f-origen" onchange="pintarTabla()" aria-label="Filtrar por origen">
+        <option value="">Todos los orígenes</option>
+        <option value="WEB">WEB · portal</option>
+        <option value="WA">WA · WhatsApp</option>
+        <option value="CC">CC · call center</option>
+        <option value="RIGO">RIGO · migrado</option>
+      </select>
+      <span class="f-sep"></span>
+      <button class="f-chip" aria-pressed="false" id="f-criticos" onclick="toggleFiltro(this)">Críticos</button>
+      <button class="f-chip" aria-pressed="false" id="f-disc" onclick="toggleFiltro(this)">Con discrepancia</button>
+      <button class="f-chip" aria-pressed="false" id="f-sinpin" onclick="toggleFiltro(this)">Sin coordenada</button>
+      <span class="f-sep"></span>
+      <button class="btn btn-mini btn-primario" onclick="exportarCSV()">⬇ Exportar CSV</button>
+    </div>
+    <div class="tbl-wrap">
+      <table aria-label="Lista de reportes">
+        <thead><tr><th>Folio</th><th>Eventualidad</th><th>Estatus</th><th>Colonia (calculada)</th><th>Zona</th><th>Antigüedad</th><th>Origen</th></tr></thead>
+        <tbody id="tbody-reportes"></tbody>
+      </table>
+      <div class="vacio" id="tabla-vacia" style="display:none">Ningún reporte coincide con los filtros. Quita alguno para ampliar la búsqueda.</div>
+    </div>
+    <p class="mini" style="margin-top:10px;color:var(--tinta-2)">La exportación CSV respeta los filtros activos y la protección de datos: no incluye nombre ni teléfono del ciudadano. El contacto se consulta por expediente, con registro en bitácora — a diferencia del botón EXCEL del visor actual, que expone ambos completos en cada descarga.</p>
+  </div>
+
+  <!-- ==================== CONTRATO DE DATOS ==================== -->
+  <div class="view" id="v-datos">
+    <p class="lead">Lo que Buen Gobierno consumirá del RIGO nuevo — sin cookies de sesión, sin ingeniería inversa, sin parsers de texto libre. Este contrato existe para que la integración de esta semana no se tenga que repetir en seis meses.</p>
+
+    <div class="sec-cab"><h2>Enum de estatus (controlado y documentado)</h2><span class="mini">Pocos valores, estables. La granularidad operativa vive en un campo aparte.</span></div>
+    <div class="tbl-wrap">
+      <table class="tbl-enum" aria-label="Enum de estatus">
+        <thead><tr><th>Valor máquina</th><th>Etiqueta</th><th>¿Visible al ciudadano?</th><th>Significado</th></tr></thead>
+        <tbody>
+          <tr><td>recibido</td><td><span class="chip c-recibido">Recibido</span></td><td>Sí</td><td>Capturado por cualquier canal; aún sin revisar</td></tr>
+          <tr><td>clasificado</td><td><span class="chip c-clasificado">Clasificado</span></td><td>Sí</td><td>Validado y asignado a un área responsable</td></tr>
+          <tr><td>en_atencion</td><td><span class="chip c-en_atencion">En atención</span></td><td>Sí</td><td>Cuadrilla programada o en sitio</td></tr>
+          <tr><td>en_espera</td><td><span class="chip c-en_espera">En espera</span></td><td>Se muestra como "En atención"</td><td>Detenido por insumo o tercero (p. ej. material CFE)</td></tr>
+          <tr><td>resuelto</td><td><span class="chip c-resuelto">Resuelto</span></td><td>Sí</td><td>Trabajo terminado con evidencia; corre plazo de confirmación</td></tr>
+          <tr><td>cerrado</td><td><span class="chip c-cerrado">Cerrado</span></td><td>Sí</td><td>Confirmado por el ciudadano o cerrado por plazo (5 días)</td></tr>
+          <tr><td>reabierto</td><td><span class="chip c-reabierto">Reabierto</span></td><td>Sí</td><td>El ciudadano indicó que el problema persiste; vuelve a programarse</td></tr>
+          <tr><td>improcedente</td><td><span class="chip c-improcedente">Improcedente</span></td><td>Sí, con motivo</td><td>Fuera de competencia municipal o duplicado; el motivo queda en bitácora</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sec-cab"><h2>Equivalencia con el visor actual (capturas del 21 ago 2026)</h2><span class="mini">Para la migración y para que BG traduzca una sola vez</span></div>
+    <div class="tbl-wrap">
+      <table aria-label="Equivalencia de estatus">
+        <thead><tr><th>Estatus en el visor de hoy</th><th>Se convierte en</th><th>Nota</th></tr></thead>
+        <tbody>
+          <tr><td>Por validar</td><td><span class="chip c-recibido">Recibido</span></td><td>Entrada sin revisar</td></tr>
+          <tr><td>En proceso</td><td><span class="chip c-clasificado">Clasificado</span> / <span class="chip c-en_atencion">En atención</span> / <span class="chip c-en_espera">En espera</span></td><td>Hoy colapsados en uno; el flujo interno (Dirección → Enlace Gestor → Cuadrilla) pasa a campos de asignación, no al estatus</td></tr>
+          <tr><td>Resueltos</td><td><span class="chip c-resuelto">Resuelto</span> → <span class="chip c-cerrado">Cerrado</span></td><td>El cierre llega tras confirmación del ciudadano o plazo de 5 días</td></tr>
+          <tr><td>Cancelados</td><td><span class="chip c-improcedente">Improcedente</span></td><td>Con motivo obligatorio en bitácora</td></tr>
+          <tr><td>Duplicado</td><td>No es un estatus</td><td>Se enlaza al reporte original por ID inmutable; el folio duplicado queda como alias buscable</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="aviso" style="margin-top:14px"><span>🔎</span><span><b>Hallazgo del visor real:</b> el folio actual es <span style="font-family:'IBM Plex Mono',monospace">[COD][secuencia global de 7 dígitos]</span> — p. ej. una serie consecutiva 0026601→0026605 cruza tipos distintos (ABV, BSC, RBA, FDA, LAF). Como el código del tipo vive dentro de la llave, reclasificar obliga a renumerar: es la causa estructural de los folios dobles y la evidencia directa del principio "ID inmutable ≠ folio legible".</span></div>
+    <div class="aviso" style="margin-top:14px"><span>🔒</span><span><b>Segundo hallazgo del visor real:</b> el listado por default y su botón EXCEL muestran nombre y teléfono completos del ciudadano a cualquier usuario del tablero, y viajan en cada exportación. Este diseño los enmascara por default, exige registro en bitácora para revelarlos y los excluye del CSV — alineado al principio 5 del spec y a la LFPDPPSO.</span></div>
+
+    <div class="sec-cab"><h2>Endpoint de pull incremental para BG</h2><span class="mini">API key + rate limit · comparación timingSafeEqual, como en zonas-lookup.ts</span></div>
+    <pre class="codigo">GET /api/v1/reportes?actualizado_desde=2026-08-20T00:00:00-06:00&amp;pagina=1
+X-API-Key: ****************
+
+<span class="c">// 200 OK — paginado; el contacto del ciudadano NUNCA viaja aquí</span>
+{
+  <span class="k">"pagina"</span>: <span class="v">1</span>, <span class="k">"por_pagina"</span>: <span class="v">200</span>, <span class="k">"total"</span>: <span class="v">14</span>,
+  <span class="k">"reportes"</span>: [{
+    <span class="k">"id"</span>: <span class="v">"8f3c1a72-4b0e-4d21-9c57-2e8a11d604f1"</span>,  <span class="c">// inmutable: la llave para BG</span>
+    <span class="k">"folio"</span>: <span class="v">"RIGO-2026-004523"</span>,                <span class="c">// legible: solo presentación</span>
+    <span class="k">"folio_legado"</span>: <span class="v">null</span>,
+    <span class="k">"eventualidad"</span>: {<span class="k">"codigo"</span>: <span class="v">"LAF"</span>, <span class="k">"nombre"</span>: <span class="v">"Lámpara Fundida"</span>},
+    <span class="k">"estatus"</span>: <span class="v">"en_atencion"</span>,                    <span class="c">// valor del enum, nunca texto libre</span>
+    <span class="k">"ubicacion"</span>: {<span class="k">"lat"</span>: <span class="v">25.88412</span>, <span class="k">"lng"</span>: <span class="v">-97.51260</span>,
+      <span class="k">"colonia_calculada"</span>: <span class="v">"Buenavista"</span>, <span class="k">"zona"</span>: <span class="v">41</span>},  <span class="c">// point-in-polygon, cartografía BG</span>
+    <span class="k">"creado_en"</span>: <span class="v">"2026-08-20T09:17:22-06:00"</span>,
+    <span class="k">"actualizado_en"</span>: <span class="v">"2026-08-21T08:30:11-06:00"</span>
+  }]
+}</pre>
+
+    <div class="sec-cab"><h2>Webhook de cambio de estatus (fase 2, opcional)</h2><span class="mini">Si es mucho para v1, el pull paginado basta</span></div>
+    <pre class="codigo">POST https://bg.ejemplo/webhooks/rigo   <span class="c">// firmado con HMAC compartido</span>
+{ <span class="k">"evento"</span>: <span class="v">"estatus_cambiado"</span>, <span class="k">"id"</span>: <span class="v">"8f3c1a72-…"</span>,
+  <span class="k">"de"</span>: <span class="v">"en_atencion"</span>, <span class="k">"a"</span>: <span class="v">"resuelto"</span>, <span class="k">"en"</span>: <span class="v">"2026-08-21T13:47:02-06:00"</span> }</pre>
+
+    <div class="sec-cab"><h2>Principios de origen</h2><span class="mini">Del spec de 77 Studio; este prototipo los encarna en la interfaz</span></div>
+    <div class="card">
+      <ul class="check-origen">
+        <li><span class="ok">✓</span><div><b>ID inmutable, folio aparte.</b><small>El UUID nunca cambia aunque el reporte se reclasifique; el folio legible es una columna de presentación. La reclasificación queda en bitácora, no dentro del string — nunca más 2,257 duplicados por paréntesis.</small></div></li>
+        <li><span class="ok">✓</span><div><b>La coordenada es obligatoria y manda.</b><small>Sin pin confirmado no hay envío. Cuando texto y pin se contradicen, el pin tiene razón 4.8 a 1 — por eso la colonia se calcula por punto-en-polígono, nunca se captura.</small></div></li>
+        <li><span class="ok">✓</span><div><b>Una sola cartografía.</b><small>Zona y sección se derivan de la capa zona_seccion de BG (282 secciones, sin huecos ni traslapes). Ninguna copia paralela que pueda divergir.</small></div></li>
+        <li><span class="ok">✓</span><div><b>Contacto protegido por diseño.</b><small>Nombre y teléfono se capturan desde el esquema inicial, enmascarados en toda vista, revelables solo con registro en bitácora, y jamás en la API pública ni en la de BG.</small></div></li>
+        <li><span class="ok">✓</span><div><b>Fotos a la nube desde el primer commit.</b><small>R2/S3 con URLs firmadas con expiración; tipo validado por magic bytes, nunca por el Content-Type del navegador.</small></div></li>
+        <li><span class="ok">✓</span><div><b>Superficie pública endurecida.</b><small>Rate limiting por IP en el envío, CAPTCHA, sanitización de texto libre (XSS), HTTPS total y panel administrativo separado por completo de la cara pública.</small></div></li>
+        <li><span class="ok">✓</span><div><b>Respaldo y pulso.</b><small>Backups automáticos con retención definida y healthcheck externo que avisa si la página cae — es cara pública del ayuntamiento.</small></div></li>
+      </ul>
+    </div>
+    <p class="mini" style="margin-top:12px;color:var(--tinta-2)">Stack propuesto: el mismo de Buen Gobierno (Node/Express/Postgres + PostGIS/Next.js) para reutilizar componentes ya probados — pin de mapa, validación de fotos, zona por coordenada. No hay backend previo que migrar: el avance actual es el frontend del portal ciudadano, portable a este stack.</p>
+  </div>
+
+  </main>
+</div>
+</div>
+
+<!-- ==================== DRAWER EXPEDIENTE ==================== -->
+<div class="velo" id="velo" onclick="cerrarExp()"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="Expediente del reporte">
+  <div class="dw-cab">
+    <div>
+      <span class="fol" id="dw-folio">—</span>
+      <span class="chip" id="dw-chip" style="margin-left:10px">—</span>
+      <span class="id" id="dw-id">ID interno: — · inmutable</span>
+    </div>
+    <button class="dw-cerrar" onclick="cerrarExp()" aria-label="Cerrar expediente">✕</button>
+  </div>
+  <div class="dw-cuerpo">
+    <div class="dw-sec">
+      <h4>Datos del reporte</h4>
+      <dl class="dw-datos" id="dw-datos"></dl>
+      <div id="dw-disc"></div>
+    </div>
+    <div class="dw-sec">
+      <h4>Ubicación</h4>
+      <dl class="dw-datos" id="dw-ubi"></dl>
+      <div style="margin-top:10px" id="dw-ubi-btn"></div>
+    </div>
+    <div class="dw-sec">
+      <h4>Evidencia</h4>
+      <div class="evid" id="dw-evid"></div>
+    </div>
+    <div class="dw-sec">
+      <h4>Contacto del ciudadano <span class="pastilla" style="font-family:'IBM Plex Mono',monospace;font-size:.58rem;background:var(--papel);border:1px solid var(--linea);border-radius:999px;padding:2px 8px;color:var(--tinta-2)">dato personal</span></h4>
+      <div class="contacto-oculto" id="dw-contacto">—</div>
+      <div id="dw-revelar-zona" style="margin-top:8px"></div>
+      <p class="nota-reg">Nunca visible en vistas públicas ni en la API de BG. Cada revelación queda en bitácora.</p>
+    </div>
+    <div class="dw-sec">
+      <h4>Acciones</h4>
+      <div class="dw-acciones">
+        <select id="dw-nuevo-estatus" aria-label="Nuevo estatus"></select>
+        <button class="btn btn-primario btn-mini" onclick="aplicarEstatus()">Aplicar cambio</button>
+      </div>
+      <p class="nota-reg">El cambio actualiza el enum y agrega una entrada de auditoría. El ID y el folio no se tocan.</p>
+    </div>
+    <div class="dw-sec">
+      <h4>Bitácora de auditoría</h4>
+      <ul class="bitacora" id="dw-bitacora"></ul>
+    </div>
+  </div>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ================= Catálogos ================= */
+var ESTATUS=['recibido','clasificado','en_atencion','en_espera','resuelto','cerrado','reabierto','improcedente'];
+var ETAPA_REAL={recibido:'Por validar',clasificado:'Asignado a Dirección',en_atencion:'En Cuadrilla',en_espera:'Detenido por insumo',resuelto:'Resuelto · por validar cierre',cerrado:'Cerrado',reabierto:'Reasignación',improcedente:'Cancelado'};
+var ETQ={recibido:'Recibido',clasificado:'Clasificado',en_atencion:'En atención',en_espera:'En espera',resuelto:'Resuelto',cerrado:'Cerrado',reabierto:'Reabierto',improcedente:'Improcedente'};
+var COLOR={recibido:'#6F5E63',clasificado:'#C2953A',en_atencion:'#B67A1C',en_espera:'#7C6A93',resuelto:'#2E7D4F',cerrado:'#1F5A38',reabierto:'#B3392E',improcedente:'#9C8D8F'};
+var FAMILIAS=['Baches y vialidades','Alumbrado público','Agua y drenaje','Basura y limpieza','Parques y áreas verdes','Postes y cableado','Convivencia y vía pública'];
+var CRITICOS=['CAC','CAE','PCA','AAB','FDE'];
+/* Salvaguarda geográfica: un bbox rectangular NO distingue Matamoros de Brownsville,
+   porque la frontera es el meandro del Río Bravo, no una línea recta. Este límite
+   de latitud es un margen conservador solo para detectar errores groseros (como el
+   que corrigió Raúl el 21-ago); el chequeo definitivo es punto-en-polígono contra
+   la cartografía real (zonas_geo.pkl), pendiente de conectar cuando haya datos reales. */
+var LIM_LAT_MAX=25.876;
+function fueraDeZona(r){return r.pin && r.lat>LIM_LAT_MAX}
+function esAbierto(e){return e==='recibido'||e==='clasificado'||e==='en_atencion'||e==='en_espera'||e==='reabierto'}
+
+/* ================= Datos de demostración ================= */
+var R=[
+{id:'r01',folio:'RIGO-2026-004523',legado:null,ev:'Lámpara Fundida',cod:'LAF',fam:'Alumbrado público',est:'en_atencion',dias:1,creado:'20 ago · 9:17',act:'21 ago · 8:30',col:'Buenavista',colTxt:null,zona:41,lat:25.87100,lng:-97.51500,pin:true,cuadrilla:'Alumbrado Norte 2',canal:'WA',nombre:'Raúl P.',tel:'8689994521',fotos:1,
+ bit:[{t:'20 ago 9:17',x:'Creado por WhatsApp con ubicación nativa; colonia y zona derivadas por coordenada'},{t:'20 ago 11:02',x:'Clasificado: Servicios Públicos · Alumbrado'},{t:'21 ago 8:30',x:'Cuadrilla Alumbrado Norte 2 programada'}]},
+{id:'r02',folio:'RIGO-2026-004519',legado:null,ev:'Cable Caído',cod:'CAC',fam:'Postes y cableado',est:'reabierto',dias:6,creado:'15 ago · 7:44',act:'21 ago · 7:10',col:'Euzkadi',colTxt:'Buenavista',zona:41,lat:25.86000,lng:-97.52400,pin:true,cuadrilla:'Electrificación 1',canal:'WEB',nombre:'María G.',tel:'8681234567',fotos:2,
+ bit:[{t:'15 ago 7:44',x:'Creado por portal web con pin confirmado'},{t:'15 ago 8:01',x:'Marcado crítico: aviso 911 mostrado al ciudadano'},{t:'17 ago 16:20',x:'Resuelto con evidencia de cuadrilla'},{t:'21 ago 7:10',x:'Reabierto por el ciudadano: el cable volvió a caer'}]},
+{id:'r03',folio:'RIGO-2026-004515',legado:null,ev:'Fuga de Drenaje',cod:'FDE',fam:'Agua y drenaje',est:'clasificado',dias:2,creado:'19 ago · 12:05',act:'20 ago · 9:40',col:'Lucio Blanco',colTxt:null,zona:23,lat:25.84600,lng:-97.47500,pin:true,cuadrilla:'—',canal:'WA',nombre:'José L.',tel:'8687654321',fotos:1,
+ bit:[{t:'19 ago 12:05',x:'Creado por WhatsApp'},{t:'20 ago 9:40',x:'Clasificado: JAD · Drenaje; pendiente asignar cuadrilla'}]},
+{id:'r04',folio:'RIGO-2026-004528',legado:null,ev:'Recolección de Basura',cod:'RBA',fam:'Basura y limpieza',est:'recibido',dias:0,creado:'21 ago · 8:12',act:'21 ago · 8:12',col:'Centro',colTxt:null,zona:7,lat:25.87200,lng:-97.50300,pin:true,cuadrilla:'—',canal:'CC',nombre:'Ana R.',tel:'8689876543',fotos:0,
+ bit:[{t:'21 ago 8:12',x:'Creado por teléfono (810 8000); operadora capturó pin con el ciudadano en línea'}]},
+{id:'r05',folio:'RIGO-2026-004501',legado:null,ev:'Bache Superficial',cod:'BAS',fam:'Baches y vialidades',est:'en_atencion',dias:4,creado:'17 ago · 10:30',act:'20 ago · 14:15',col:'Integración Familiar',colTxt:null,zona:52,lat:25.83300,lng:-97.52300,pin:true,cuadrilla:'Bacheo Sur 3',canal:'WEB',nombre:'Pedro M.',tel:'8682345678',fotos:2,
+ bit:[{t:'17 ago 10:30',x:'Creado por portal web'},{t:'18 ago 9:00',x:'Clasificado: Mantenimiento y Conservación Urbana'},{t:'20 ago 14:15',x:'Cuadrilla Bacheo Sur 3 en ruta'}]},
+{id:'r06',folio:'RIGO-2026-004496',legado:null,ev:'Alcantarilla Abierta',cod:'AAB',fam:'Agua y drenaje',est:'clasificado',dias:3,creado:'18 ago · 15:22',act:'19 ago · 8:05',col:'Las Culturas',colTxt:null,zona:20,lat:25.86200,lng:-97.55100,pin:true,cuadrilla:'—',canal:'WA',nombre:'Laura T.',tel:'8683456789',fotos:1,
+ bit:[{t:'18 ago 15:22',x:'Creado por WhatsApp; marcado crítico'},{t:'19 ago 8:05',x:'Clasificado: JAD · Alcantarillado'}]},
+{id:'r07',folio:'RIGO-2026-004490',legado:null,ev:'Sector Apagado',cod:'SEA',fam:'Alumbrado público',est:'en_espera',dias:5,creado:'16 ago · 20:41',act:'19 ago · 11:00',col:'Voluntad y Trabajo',colTxt:null,zona:51,lat:25.84100,lng:-97.54100,pin:true,cuadrilla:'Alumbrado Sur 1',canal:'WEB',nombre:'Carmen V.',tel:'8684567890',fotos:0,
+ bit:[{t:'16 ago 20:41',x:'Creado por portal web'},{t:'17 ago 9:15',x:'Clasificado: Alumbrado; sector completo sin energía'},{t:'19 ago 11:00',x:'En espera: material de CFE; motivo registrado'}]},
+{id:'r08',folio:'RIGO-2026-004480',legado:null,ev:'Poda de Árboles en Vía Publica',cod:'AVP',fam:'Parques y áreas verdes',est:'resuelto',dias:7,creado:'14 ago · 9:00',act:'20 ago · 17:30',col:'Jardín',colTxt:null,zona:9,lat:25.86500,lng:-97.49500,pin:true,cuadrilla:'Parques 2',canal:'WEB',nombre:'Diego S.',tel:'8685678901',fotos:2,
+ bit:[{t:'14 ago 9:00',x:'Creado por portal web'},{t:'20 ago 17:30',x:'Resuelto con evidencia antes y después; corre plazo de confirmación'}]},
+{id:'r09',folio:'RIGO-2026-004470',legado:null,ev:'Semáforos',cod:'SEM',fam:'Baches y vialidades',est:'resuelto',dias:9,creado:'12 ago · 13:10',act:'19 ago · 10:20',col:'Centro',colTxt:null,zona:7,lat:25.87000,lng:-97.50100,pin:true,cuadrilla:'Semaforización',canal:'CC',nombre:'Elena F.',tel:'8686789012',fotos:1,
+ bit:[{t:'12 ago 13:10',x:'Creado por teléfono'},{t:'19 ago 10:20',x:'Resuelto: controlador reemplazado'}]},
+{id:'r10',folio:'RIGO-2026-004455',legado:null,ev:'Lámpara Prende y Apaga',cod:'LPA',fam:'Alumbrado público',est:'cerrado',dias:12,creado:'9 ago · 19:55',act:'18 ago · 9:00',col:'Tecnológico',colTxt:null,zona:33,lat:25.85900,lng:-97.46200,pin:true,cuadrilla:'Alumbrado Norte 1',canal:'WA',nombre:'Hugo N.',tel:'8687890123',fotos:1,
+ bit:[{t:'9 ago 19:55',x:'Creado por WhatsApp'},{t:'15 ago 12:40',x:'Resuelto con evidencia'},{t:'18 ago 9:00',x:'Cerrado: ciudadano confirmó por encuesta (5 de 5)'}]},
+{id:'r11',folio:'RIGO-2026-004441',legado:null,ev:'Ruido Excesivo',cod:'REX',fam:'Convivencia y vía pública',est:'improcedente',dias:8,creado:'13 ago · 23:30',act:'14 ago · 10:10',col:'Victoria',colTxt:null,zona:12,lat:25.87000,lng:-97.48900,pin:true,cuadrilla:'—',canal:'WEB',nombre:'Sofía Q.',tel:'8688901234',fotos:0,
+ bit:[{t:'13 ago 23:30',x:'Creado por portal web'},{t:'14 ago 10:10',x:'Improcedente: competencia estatal; motivo en bitácora y notificado al ciudadano con el canal correcto'}]},
+{id:'r12',folio:'RIGO-2026-004430',legado:'LAF0009041 (LAF0002717)',ev:'Lámpara Fundida',cod:'LAF',fam:'Alumbrado público',est:'en_atencion',dias:15,creado:'6 ago · 8:00',act:'19 ago · 15:45',col:'Buenavista',colTxt:null,zona:41,lat:null,lng:null,pin:false,cuadrilla:'Alumbrado Norte 2',canal:'RIGO',nombre:'Jorge A.',tel:'8680123456',fotos:0,
+ bit:[{t:'6 ago 8:00',x:'Migrado de RIGO: folio legado con doble numeración; se asignó ID inmutable y folio nuevo'},{t:'6 ago 8:00',x:'Sin coordenada en el origen: marcado como deuda de datos; requiere pin en visita'},{t:'12 ago 10:30',x:'Reclasificado de SEA a LAF: el ID no cambió; el folio legible se conservó; historial aquí, no en el string'}]},
+{id:'r13',folio:'RIGO-2026-004522',legado:null,ev:'Baches Profundos',cod:'BAP',fam:'Baches y vialidades',est:'en_atencion',dias:1,creado:'20 ago · 11:47',act:'21 ago · 9:05',col:'Euzkadi',colTxt:null,zona:40,lat:25.86300,lng:-97.51800,pin:true,cuadrilla:'Bacheo Norte 1',canal:'WA',nombre:'Luis C.',tel:'8681112233',fotos:3,
+ bit:[{t:'20 ago 11:47',x:'Creado por WhatsApp con 3 fotos'},{t:'21 ago 9:05',x:'Cuadrilla en sitio'}]},
+{id:'r14',folio:'RIGO-2026-004512',legado:null,ev:'Camellones',cod:'CAM',fam:'Parques y áreas verdes',est:'resuelto',dias:5,creado:'16 ago · 12:20',act:'20 ago · 16:00',col:'Lucio Blanco',colTxt:null,zona:23,lat:25.84900,lng:-97.48000,pin:true,cuadrilla:'Parques 1',canal:'WEB',nombre:'Rosa D.',tel:'8682223344',fotos:2,
+ bit:[{t:'16 ago 12:20',x:'Creado por portal web'},{t:'20 ago 16:00',x:'Resuelto con evidencia'}]}
+];
+
+/* ================= Utilidades ================= */
+function porId(id){for(var i=0;i<R.length;i++){if(R[i].id===id)return R[i]}return null}
+function chipHTML(e){return '<span class="chip c-'+e+'">'+ETQ[e]+'</span>'}
+function edadColor(r){
+  if(!esAbierto(r.est)){return '#B9AFA3'}
+  if(r.dias<=2){return COLOR.resuelto}
+  if(r.dias<=5){return COLOR.en_atencion}
+  return COLOR.reabierto;
+}
+function esCritico(r){return CRITICOS.indexOf(r.cod)>=0 && esAbierto(r.est)}
+function tieneDisc(r){return r.colTxt && r.colTxt!==r.col}
+function maskTel(t){return t.slice(0,3)+' ··· '+t.slice(-4)}
+function maskNombre(n){return n.charAt(0)+'···'+n.slice(n.indexOf(' '))}
+
+/* ================= Navegación ================= */
+var TITULOS={mando:'Resumen operativo',mapa:'Mapa operativo',lista:'Reportes',datos:'Contrato de datos'};
+function ir(v){
+  document.querySelectorAll('.view').forEach(function(el){el.classList.remove('active')});
+  document.getElementById('v-'+v).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(function(b){
+    if(b.dataset.v===v){b.setAttribute('aria-current','page')}else{b.removeAttribute('aria-current')}
+  });
+  document.getElementById('titulo-vista').textContent=TITULOS[v];
+  if(v==='mapa'){setTimeout(initMapaOps,60)}
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* ================= Resumen ================= */
+function pintarKPIs(){
+  var abiertos=R.filter(function(r){return esAbierto(r.est)});
+  var criticos=R.filter(esCritico);
+  var conPin=R.filter(function(r){return r.pin}).length;
+  var resueltosSem=R.filter(function(r){return r.est==='resuelto'||r.est==='cerrado'}).length;
+  var html='';
+  html+='<div class="kpi"><div class="num">'+abiertos.length+'</div><div class="lbl">Abiertos ahora</div></div>';
+  html+='<div class="kpi alerta"><div class="num">'+criticos.length+'</div><div class="lbl">Críticos abiertos</div></div>';
+  html+='<div class="kpi ok"><div class="num">'+resueltosSem+'</div><div class="lbl">Resueltos · 7 días</div></div>';
+  html+='<div class="kpi"><div class="num">4.6 d</div><div class="lbl">Tiempo prom. de solución</div></div>';
+  html+='<div class="kpi"><div class="num">'+Math.round(conPin*100/R.length)+'%</div><div class="lbl">Con coordenada verificada</div></div>';
+  document.getElementById('kpis').innerHTML=html;
+  document.getElementById('cnt-abiertos').textContent=abiertos.length;
+  document.getElementById('cnt-total').textContent=R.length;
+}
+function pintarCriticos(){
+  var html='';
+  R.filter(esCritico).sort(function(a,b){return b.dias-a.dias}).forEach(function(r){
+    html+='<div class="fila-critico"><span class="fol">'+r.folio+'</span><span>'+r.ev+' ('+r.cod+') · '+r.col+' · Z'+r.zona+'</span>'+chipHTML(r.est)+'<button class="btn btn-mini btn-borde abrir" onclick="abrirExp(\''+r.id+'\')">Abrir</button></div>';
+  });
+  document.getElementById('lista-criticos').innerHTML=html||'<p class="mini" style="color:var(--tinta-2)">Sin críticos abiertos ahora.</p>';
+}
+function pintarEdad(){
+  var ab=R.filter(function(r){return esAbierto(r.est)});
+  var b=[{l:'0–2 días',c:COLOR.resuelto,n:0},{l:'3–5 días',c:COLOR.en_atencion,n:0},{l:'6–10 días',c:COLOR.reabierto,n:0},{l:'Más de 10 días',c:'#7E241C',n:0}];
+  ab.forEach(function(r){
+    if(r.dias<=2){b[0].n++}else if(r.dias<=5){b[1].n++}else if(r.dias<=10){b[2].n++}else{b[3].n++}
+  });
+  var max=Math.max(1,b[0].n,b[1].n,b[2].n,b[3].n);
+  var html='';
+  b.forEach(function(x){
+    html+='<div class="barra"><div class="b-lbl"><span>'+x.l+'</span><span>'+x.n+'</span></div><div class="b-track"><div class="b-fill" style="width:'+Math.round(x.n*100/max)+'%;background:'+x.c+'"></div></div></div>';
+  });
+  document.getElementById('barras-edad').innerHTML=html;
+}
+function pintarFamilia(){
+  var html='';
+  FAMILIAS.forEach(function(f){
+    var n=R.filter(function(r){return r.fam===f&&esAbierto(r.est)}).length;
+    if(n===0){return}
+    html+='<div class="barra"><div class="b-lbl"><span>'+f+'</span><span>'+n+'</span></div><div class="b-track"><div class="b-fill" style="width:'+Math.round(n*100/4)+'%;background:var(--guinda)"></div></div></div>';
+  });
+  document.getElementById('barras-familia').innerHTML=html;
+}
+function pintarDeuda(){
+  var sinPin=R.filter(function(r){return !r.pin}).length;
+  var disc=R.filter(tieneDisc).length;
+  var leg=R.filter(function(r){return r.legado}).length;
+  var fz=R.filter(fueraDeZona).length;
+  var html='';
+  if(fz>0){
+    html+='<li><span class="ic">🌎</span><div><b>'+fz+' con coordenada fuera del margen esperado</b><small>La latitud cae por encima del límite conservador (posible cruce al lado de Brownsville). Requiere revisión manual antes de mostrarse en el mapa.</small><button class="btn btn-mini btn-fantasma" style="margin-top:6px" onclick="ir(\'mapa\')">Ver en el mapa</button></div></li>';
+  }
+  html+='<li><span class="ic">📍</span><div><b>'+sinPin+' sin coordenada</b><small>Migrados del RIGO anterior; requieren pin en visita. En el sistema nuevo el pin es obligatorio para enviar.</small><button class="btn btn-mini btn-fantasma" style="margin-top:6px" onclick="verDeuda(\'f-sinpin\')">Ver</button></div></li>';
+  html+='<li><span class="ic">⚠️</span><div><b>'+disc+' con discrepancia colonia</b><small>El texto del ciudadano y la coordenada no coinciden. El pin manda (4.8 a 1); la colonia mostrada es la calculada.</small><button class="btn btn-mini btn-fantasma" style="margin-top:6px" onclick="verDeuda(\'f-disc\')">Ver</button></div></li>';
+  html+='<li><span class="ic">🔢</span><div><b>'+leg+' con folio legado doble</b><small>Formato "actual (anterior)" del RIGO viejo. Ya tienen ID inmutable; el legado queda solo como referencia buscable.</small><button class="btn btn-mini btn-fantasma" style="margin-top:6px" onclick="verDeuda(\'f-criticos\',true)">Ver</button></div></li>';
+  document.getElementById('lista-deuda').innerHTML=html;
+}
+function verDeuda(toggleId,esLegado){
+  document.querySelectorAll('#v-lista .f-chip').forEach(function(c){c.setAttribute('aria-pressed','false')});
+  document.getElementById('f-estatus').value='';
+  document.getElementById('f-familia').value='';
+  if(!esLegado){document.getElementById(toggleId).setAttribute('aria-pressed','true')}
+  ir('lista');
+  pintarTabla();
+  if(esLegado){abrirExp('r12')}
+}
+
+/* ================= Lista ================= */
+function llenarSelects(){
+  var se=document.getElementById('f-estatus');
+  ESTATUS.forEach(function(e){var o=document.createElement('option');o.value=e;o.textContent=ETQ[e];se.appendChild(o)});
+  var sf=document.getElementById('f-familia');
+  FAMILIAS.forEach(function(f){var o=document.createElement('option');o.value=f;o.textContent=f;sf.appendChild(o)});
+}
+function activo(id){return document.getElementById(id).getAttribute('aria-pressed')==='true'}
+function toggleFiltro(btn){
+  btn.setAttribute('aria-pressed', btn.getAttribute('aria-pressed')==='true'?'false':'true');
+  pintarTabla();
+}
+function reportesFiltrados(){
+  var fe=document.getElementById('f-estatus').value;
+  var ff=document.getElementById('f-familia').value;
+  var fo=document.getElementById('f-origen').value;
+  return R.filter(function(r){
+    if(fe&&r.est!==fe){return false}
+    if(ff&&r.fam!==ff){return false}
+    if(fo&&r.canal!==fo){return false}
+    if(activo('f-criticos')&&!esCritico(r)){return false}
+    if(activo('f-disc')&&!tieneDisc(r)){return false}
+    if(activo('f-sinpin')&&r.pin){return false}
+    return true;
+  }).sort(function(a,b){
+    var oa=esAbierto(a.est)?0:1, ob=esAbierto(b.est)?0:1;
+    if(oa!==ob){return oa-ob}
+    return b.dias-a.dias;
+  });
+}
+
+function pintarTabla(){
+  var datos=reportesFiltrados();
+  var html='';
+  datos.forEach(function(r){
+    var colCell=r.col;
+    if(tieneDisc(r)){colCell+=' <span class="disc" title="El ciudadano escribió: '+r.colTxt+'. La coordenada cae en: '+r.col+'. El pin manda.">⚠ texto: '+r.colTxt+'</span>'}
+    if(!r.pin){colCell+=' <span class="disc" title="Sin coordenada; colonia tomada del texto migrado">⚠ sin pin</span>'}
+    html+='<tr onclick="abrirExp(\''+r.id+'\')" tabindex="0" onkeydown="if(event.key===\'Enter\'){abrirExp(\''+r.id+'\')}">'
+      +'<td class="t-folio">'+r.folio+(r.legado?'<small>legado: '+r.legado+'</small>':'')+'</td>'
+      +'<td class="t-ev"><b>'+r.ev+'</b><span>'+r.cod+' · '+r.fam+'</span></td>'
+      +'<td>'+chipHTML(r.est)+'</td>'
+      +'<td class="t-col">'+colCell+'</td>'
+      +'<td class="t-num">Z'+r.zona+'</td>'
+      +'<td class="t-num"><span class="punto-edad" style="background:'+edadColor(r)+'"></span>'+r.dias+' d</td>'
+      +'<td>'+r.canal+'</td></tr>';
+  });
+  document.getElementById('tbody-reportes').innerHTML=html;
+  document.getElementById('tabla-vacia').style.display=datos.length?'none':'block';
+}
+
+function exportarCSV(){
+  var datos=reportesFiltrados();
+  var enc=['id_interno','folio','folio_legado','eventualidad','codigo','familia','estatus','etapa_flujo_actual','colonia_calculada','zona','origen','dias_abierto','creado','actualizado','lat','lng'];
+  var filas=[enc.join(',')];
+  datos.forEach(function(r){
+    var v=[r.id, r.folio, r.legado||'', r.ev, r.cod, r.fam, ETQ[r.est], ETAPA_REAL[r.est], r.col, 'Z'+r.zona, r.canal, r.dias, r.creado, r.act, r.pin?r.lat:'', r.pin?r.lng:''];
+    filas.push(v.map(function(x){
+      x=String(x);
+      return (x.indexOf(',')>=0||x.indexOf('"')>=0)?('"'+x.replace(/"/g,'""')+'"'):x;
+    }).join(','));
+  });
+  var blob=new Blob(['\ufeff'+filas.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='reportes_rigo_demo.csv';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},400);
+}
+
+/* ================= Mapa operativo ================= */
+var mapaOps=null,capa=null,marcas={},fmModo='abiertos',fmCrit=false;
+function initMapaOps(){
+  if(mapaOps){setTimeout(function(){mapaOps.invalidateSize()},60);return}
+  mapaOps=L.map('mapaOps').setView([25.868,-97.503],12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'}).addTo(mapaOps);
+  capa=L.layerGroup().addTo(mapaOps);
+  pintarMarcas();
+  pintarLeyenda();
+  setTimeout(function(){mapaOps.invalidateSize()},60);
+}
+function enModo(r){
+  if(fmCrit&&!esCritico(r)){return false}
+  if(fmModo==='abiertos'){return esAbierto(r.est)}
+  if(fmModo==='resueltos'){return r.est==='resuelto'||r.est==='cerrado'}
+  return true;
+}
+function pintarMarcas(){
+  if(!capa){return}
+  capa.clearLayers();marcas={};
+  var n=0;
+  R.forEach(function(r){
+    if(!r.pin||!enModo(r)){return}
+    n++;
+    var advertencia=fueraDeZona(r);
+    var m=L.circleMarker([r.lat,r.lng],{
+      radius:advertencia?11:9,
+      color:advertencia?'#B3392E':'#FFFFFF',
+      weight:advertencia?3:2,
+      dashArray:advertencia?'3,3':null,
+      fillColor:advertencia?'#B3392E':COLOR[r.est],
+      fillOpacity:advertencia?.5:.92
+    });
+    var pop='<span class="pop-fol">'+r.folio+'</span><br><b>'+r.ev+'</b> ('+r.cod+')<br>'+chipHTML(r.est);
+    if(advertencia){pop+='<br><span style="color:var(--e-reabierto);font-weight:700;font-size:.72rem">⚠ Coordenada fuera del margen esperado — revisar antes de asignar cuadrilla</span>'}
+    pop+='<br><button class="btn btn-mini btn-borde" style="margin-top:8px" onclick="abrirExp(\''+r.id+'\')">Abrir expediente</button>';
+    m.bindPopup(pop);
+    m.addTo(capa);marcas[r.id]=m;
+  });
+  var sinPin=R.filter(function(r){return !r.pin}).length;
+  document.getElementById('nota-sin-pin').textContent=(sinPin? sinPin+' reporte migrado no aparece en el mapa: no tiene coordenada (por eso el pin es obligatorio en el sistema nuevo). ':'')+n+' puntos visibles con el filtro actual.';
+}
+function pintarLeyenda(){
+  var html='';
+  ESTATUS.forEach(function(e){html+='<span><i style="background:'+COLOR[e]+'"></i>'+ETQ[e]+'</span>'});
+  document.getElementById('leyenda-mapa').innerHTML=html;
+}
+function filtroMapa(modo,btn){
+  fmModo=modo;
+  document.querySelectorAll('[data-fm]').forEach(function(b){b.setAttribute('aria-pressed','false')});
+  btn.setAttribute('aria-pressed','true');
+  pintarMarcas();
+}
+function toggleCriticosMapa(btn){
+  fmCrit=!fmCrit;
+  btn.setAttribute('aria-pressed',fmCrit?'true':'false');
+  pintarMarcas();
+}
+function verEnMapa(id){
+  var r=porId(id);
+  if(!r||!r.pin){return}
+  cerrarExp();
+  ir('mapa');
+  setTimeout(function(){
+    if(!marcas[id]){fmModo='todos';fmCrit=false;
+      document.querySelectorAll('[data-fm]').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.fm==='todos'?'true':'false')});
+      document.getElementById('fm-criticos').setAttribute('aria-pressed','false');
+      pintarMarcas();
+    }
+    mapaOps.setView([r.lat,r.lng],17);
+    marcas[id].openPopup();
+  },140);
+}
+
+/* ================= Búsqueda de folio (tolerante a formato viejo y doble) ================= */
+function buscarFolio(){
+  var q=document.getElementById('q-folio').value.trim().toUpperCase();
+  var nota=document.getElementById('busca-nota');
+  nota.style.display='none';
+  if(!q){return}
+  var m=q.match(/RIGO-\d{4}-\d{6}/)||q.match(/[A-Z]{3}\s*\d{4,7}/)||q.match(/\d{4,7}/);
+  var token=m?m[0].replace(/\s+/g,''):q;
+  var hit=null;
+  R.forEach(function(r){
+    if(hit){return}
+    if(r.folio.toUpperCase().indexOf(token)>=0){hit=r;return}
+    if(r.legado&&r.legado.toUpperCase().replace(/\s+/g,'').indexOf(token)>=0){hit=r}
+  });
+  if(hit){abrirExp(hit.id)}else{nota.style.display='block';setTimeout(function(){nota.style.display='none'},3500)}
+}
+document.getElementById('q-folio').addEventListener('keydown',function(e){if(e.key==='Enter'){buscarFolio()}});
+
+/* ================= Expediente (drawer) ================= */
+var expActual=null;
+function abrirExp(id){
+  var r=porId(id);if(!r){return}
+  expActual=id;
+  document.getElementById('dw-folio').textContent=r.folio;
+  var ch=document.getElementById('dw-chip');
+  ch.className='chip c-'+r.est;ch.textContent=ETQ[r.est];
+  ch.style.background='rgba(255,255,255,.16)';ch.style.color='#fff';
+  document.getElementById('dw-id').textContent='ID interno: 8f3c1a72-…-'+id.slice(1)+' · inmutable'+(r.legado?' · legado: '+r.legado:'');
+  var d='';
+  d+='<div><dt>Eventualidad</dt><dd>'+r.ev+' ('+r.cod+')</dd></div>';
+  d+='<div><dt>Familia</dt><dd>'+r.fam+'</dd></div>';
+  d+='<div><dt>Origen</dt><dd>'+r.canal+'</dd></div>';
+  d+='<div><dt>Etapa en el flujo actual</dt><dd>'+ETAPA_REAL[r.est]+'</dd></div>';
+  d+='<div><dt>Cuadrilla</dt><dd>'+r.cuadrilla+'</dd></div>';
+  d+='<div><dt>Creado</dt><dd>'+r.creado+'</dd></div>';
+  d+='<div><dt>Actualizado</dt><dd>'+r.act+'</dd></div>';
+  document.getElementById('dw-datos').innerHTML=d;
+  document.getElementById('dw-disc').innerHTML=tieneDisc(r)?'<div class="aviso-disc">⚠ El ciudadano escribió "<b>'+r.colTxt+'</b>", pero la coordenada cae en "<b>'+r.col+'</b>". Se muestra la calculada: cuando ambas se contradicen, el pin tiene razón 4.8 veces más.</div>':'';
+  var u='';
+  u+='<div><dt>Coordenada</dt><dd style="font-family:IBM Plex Mono,monospace;font-size:.76rem">'+(r.pin?(r.lat.toFixed(5)+', '+r.lng.toFixed(5)):'Sin pin (migrado)')+'</dd></div>';
+  u+='<div><dt>Colonia calculada</dt><dd>'+r.col+(r.pin?'':' (del texto)')+'</dd></div>';
+  u+='<div><dt>Zona</dt><dd>Z'+r.zona+'</dd></div>';
+  u+='<div><dt>Fuente</dt><dd>'+(r.pin?'Punto-en-polígono':'Pendiente de pin')+'</dd></div>';
+  document.getElementById('dw-ubi').innerHTML=u;
+  document.getElementById('dw-ubi-btn').innerHTML=r.pin?'<button class="btn btn-mini btn-borde" onclick="verEnMapa(\''+r.id+'\')">Ver en el mapa operativo</button>':'<span class="mini" style="font-size:.76rem;color:var(--e-atencion)">Requiere captura de pin en visita de campo.</span>';
+  var ev='';
+  if(r.fotos===0){ev='<span class="mini" style="color:var(--tinta-2);font-size:.78rem">Sin fotos adjuntas.</span>'}
+  else{for(var i=1;i<=r.fotos;i++){ev+='<div class="ph">Foto '+i+' · URL firmada</div>'}}
+  document.getElementById('dw-evid').innerHTML=ev;
+  pintarContacto(r);
+  var se=document.getElementById('dw-nuevo-estatus');
+  se.innerHTML='';
+  ESTATUS.forEach(function(e){
+    if(e===r.est){return}
+    var o=document.createElement('option');o.value=e;o.textContent='Cambiar a: '+ETQ[e];se.appendChild(o);
+  });
+  pintarBitacora(r);
+  document.getElementById('velo').classList.add('on');
+  document.getElementById('drawer').classList.add('on');
+}
+function pintarContacto(r){
+  var c=document.getElementById('dw-contacto');
+  var z=document.getElementById('dw-revelar-zona');
+  if(r.rev){
+    c.textContent=r.nombre+' · '+r.tel;
+    z.innerHTML='<span class="mini" style="font-size:.74rem;color:var(--e-resuelto)">Revelado en esta sesión; el acceso quedó en bitácora.</span>';
+  }else{
+    c.textContent=maskNombre(r.nombre)+' · '+maskTel(r.tel);
+    z.innerHTML='<button class="btn btn-mini btn-fantasma" onclick="revelar()">Revelar contacto (queda en bitácora)</button>';
+  }
+}
+function revelar(){
+  var r=porId(expActual);if(!r){return}
+  r.rev=true;
+  r.bit.push({t:'21 ago · ahora',x:'Contacto revelado por Mesa de control (demo); acceso registrado'});
+  pintarContacto(r);pintarBitacora(r);
+}
+function pintarBitacora(r){
+  var html='';
+  r.bit.slice().reverse().forEach(function(b){html+='<li><time>'+b.t+'</time><span>'+b.x+'</span></li>'});
+  document.getElementById('dw-bitacora').innerHTML=html;
+}
+function aplicarEstatus(){
+  var r=porId(expActual);if(!r){return}
+  var nuevo=document.getElementById('dw-nuevo-estatus').value;
+  if(!nuevo||nuevo===r.est){return}
+  r.bit.push({t:'21 ago · ahora',x:'Estatus: '+ETQ[r.est]+' → '+ETQ[nuevo]+' (Mesa de control, demo). ID y folio sin cambios'});
+  r.est=nuevo;
+  abrirExp(r.id);
+  pintarKPIs();pintarCriticos();pintarEdad();pintarFamilia();pintarTabla();
+  if(capa){pintarMarcas()}
+}
+function cerrarExp(){
+  document.getElementById('velo').classList.remove('on');
+  document.getElementById('drawer').classList.remove('on');
+}
+document.addEventListener('keydown',function(e){if(e.key==='Escape'){cerrarExp()}});
+
+/* ================= Arranque ================= */
+llenarSelects();
+pintarKPIs();
+pintarCriticos();
+pintarEdad();
+pintarFamilia();
+pintarDeuda();
+pintarTabla();
+</script>
+</body>
+</html>
