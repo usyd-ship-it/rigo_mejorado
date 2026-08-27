@@ -3,16 +3,10 @@ import express from "express";
 import helmet from "helmet";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
-import { Pool } from "pg";
+import { pool } from "./lib/db.js";
+import reportesRouter from "./routes/reportes.js";
 
 const PORT = process.env.PORT || 4000;
-
-// Supabase pooler exige TLS; rejectUnauthorized:false es punto de partida
-// para desarrollo — revisar antes de producción (spec punto 9, HTTPS total).
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-});
 
 const app = express();
 app.use(helmet());
@@ -32,6 +26,8 @@ app.get("/health/db", async (_req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+app.use("/reportes", reportesRouter);
 
 app.listen(PORT, () => {
   console.log(`rigo-api escuchando en http://localhost:${PORT}`);
