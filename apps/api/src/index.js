@@ -5,6 +5,7 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { pool } from "./lib/db.js";
 import reportesRouter from "./routes/reportes.js";
+import mandoRouter from "./routes/mando.js";
 
 const PORT = process.env.PORT || 4000;
 
@@ -28,6 +29,7 @@ app.get("/health/db", async (_req, res) => {
 });
 
 app.use("/reportes", reportesRouter);
+app.use("/mando", mandoRouter);
 
 app.listen(PORT, () => {
   console.log(`rigo-api escuchando en http://localhost:${PORT}`);
