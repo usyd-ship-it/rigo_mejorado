@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const r2 = new S3Client({
   region: "auto",
@@ -20,4 +21,12 @@ export async function subirEvidencia({ objectKey, buffer, mimeType }) {
       ContentType: mimeType,
     })
   );
+}
+
+// URL firmada de solo lectura, expira corto — nunca URLs públicas
+// permanentes (spec §3.6).
+export async function urlFirmada(objectKey, expiresInSeconds = 900) {
+  return getSignedUrl(r2, new GetObjectCommand({ Bucket: BUCKET, Key: objectKey }), {
+    expiresIn: expiresInSeconds,
+  });
 }
