@@ -11,7 +11,6 @@ const PORT = process.env.PORT || 4000;
 
 const app = express();
 app.use(helmet());
-app.use(cors());
 app.use(express.json());
 app.use(rateLimit({ windowMs: 60_000, limit: 100 }));
 
@@ -28,8 +27,18 @@ app.get("/health/db", async (_req, res) => {
   }
 });
 
-app.use("/reportes", reportesRouter);
-app.use("/mando", mandoRouter);
+// CORS por ruta, no global — un cors() global habría interceptado el
+// preflight OPTIONS antes de que llegara al de /mando (el paquete cors
+// responde y corta el ciclo para OPTIONS, nunca llama a next()).
+// /reportes es público por diseño; /mando restringido a su origen real
+// por variable de entorno (spec §3.8: dominio separado del portal).
+const mandoCors = cors({
+  origin: process.env.MANDO_ORIGIN || "http://localhost:3001",
+  allowedHeaders: ["Content-Type", "Authorization"],
+});
+
+app.use("/reportes", cors(), reportesRouter);
+app.use("/mando", mandoCors, mandoRouter);
 
 app.listen(PORT, () => {
   console.log(`rigo-api escuchando en http://localhost:${PORT}`);
