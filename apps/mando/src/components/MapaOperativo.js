@@ -54,10 +54,9 @@ export default function MapaOperativo({ puntos, onAbrir }) {
       if (cancelado || !contenedorRef.current || mapaRef.current) return;
 
       mapaRef.current = L.map(contenedorRef.current).setView([25.868, -97.503], 12);
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
       }).addTo(mapaRef.current);
 
       clusterRef.current = L.markerClusterGroup();
