@@ -30,6 +30,36 @@ function maskTelefono(telefono) {
   return telefono.slice(0, 3) + " ··· " + telefono.slice(-4);
 }
 
+router.get("/resumen", async (req, res) => {
+  try {
+    // unnest(ESTATUS_VALIDOS) como tabla base + LEFT JOIN: garantiza que
+    // todo estatus válido aparezca con cantidad 0 si no tiene reportes,
+    // en una sola query (no se trae todo a JS para contar ahí).
+    const { rows } = await pool.query(
+      `select est.estatus, coalesce(count(r.id), 0)::int as cantidad
+       from unnest($1::text[]) as est(estatus)
+       left join reportes r on r.estatus = est.estatus
+       group by est.estatus
+       order by array_position($1::text[], est.estatus)`,
+      [ESTATUS_VALIDOS]
+    );
+
+    const total = rows.reduce((suma, fila) => suma + fila.cantidad, 0);
+    const resuelto = rows.find((fila) => fila.estatus === "resuelto");
+    const porcentajeResuelto =
+      total > 0 ? Math.round(((resuelto?.cantidad ?? 0) / total) * 1000) / 10 : 0;
+
+    res.json({
+      total,
+      por_estatus: rows,
+      porcentaje_resuelto: porcentajeResuelto,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ errors: [{ campo: null, motivo: "error interno" }] });
+  }
+});
+
 router.get("/reportes", async (req, res) => {
   const { estatus, zona, colonia, fecha_desde, fecha_hasta } = req.query;
   const pagina = Math.max(1, parseInt(req.query.pagina, 10) || 1);
