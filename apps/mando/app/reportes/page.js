@@ -1,9 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { apiMando } from "../../src/lib/api-mando";
 import ExpedienteDrawer from "../../src/components/ExpedienteDrawer";
+
+// Leaflet toca window/document al importarse — no soporta SSR.
+const MapaOperativo = dynamic(() => import("../../src/components/MapaOperativo"), { ssr: false });
 
 // Mismos 8 valores que ESTATUS_VALIDOS en apps/api — el <select> solo
 // ofrece filtros que el backend realmente acepta.
@@ -20,31 +24,45 @@ const ESTATUS_VALIDOS = [
 
 const POR_PAGINA = 50;
 
+function construirQuery(filtros, extra = {}) {
+  const params = new URLSearchParams();
+  if (filtros.estatus) params.set("estatus", filtros.estatus);
+  if (filtros.zona) params.set("zona", filtros.zona);
+  if (filtros.colonia) params.set("colonia", filtros.colonia);
+  if (filtros.fecha_desde) params.set("fecha_desde", filtros.fecha_desde);
+  if (filtros.fecha_hasta) params.set("fecha_hasta", filtros.fecha_hasta);
+  Object.entries(extra).forEach(([k, v]) => params.set(k, String(v)));
+  return params.toString();
+}
+
 export default function ReportesPage() {
+  const [filtros, setFiltros] = useState({ estatus: "", zona: "", colonia: "", fecha_desde: "", fecha_hasta: "" });
+
   const [datos, setDatos] = useState(null);
   const [error, setError] = useState(null);
   const [pagina, setPagina] = useState(1);
-  const [filtros, setFiltros] = useState({ estatus: "", zona: "", colonia: "", fecha_desde: "", fecha_hasta: "" });
+
+  const [puntosMapa, setPuntosMapa] = useState([]);
+  const [errorMapa, setErrorMapa] = useState(null);
+
   const [drawerId, setDrawerId] = useState(null);
+  const abrirDrawer = useCallback((id) => setDrawerId(id), []);
 
-  const cargar = useCallback(() => {
-    const params = new URLSearchParams();
-    params.set("pagina", String(pagina));
-    params.set("por_pagina", String(POR_PAGINA));
-    if (filtros.estatus) params.set("estatus", filtros.estatus);
-    if (filtros.zona) params.set("zona", filtros.zona);
-    if (filtros.colonia) params.set("colonia", filtros.colonia);
-    if (filtros.fecha_desde) params.set("fecha_desde", filtros.fecha_desde);
-    if (filtros.fecha_hasta) params.set("fecha_hasta", filtros.fecha_hasta);
-
-    apiMando(`/mando/reportes?${params.toString()}`)
+  // Tabla — paginada, depende de filtros + página.
+  useEffect(() => {
+    apiMando(`/mando/reportes?${construirQuery(filtros, { pagina, por_pagina: POR_PAGINA })}`)
       .then(setDatos)
       .catch((err) => setError(err.message));
-  }, [pagina, filtros]);
+  }, [filtros, pagina]);
 
+  // Mapa — SIN paginar, depende solo de filtros. No se sincroniza con
+  // la página de la tabla a propósito: el mapa siempre trae todos los
+  // puntos que cumplen el filtro, la tabla solo 50 a la vez.
   useEffect(() => {
-    cargar();
-  }, [cargar]);
+    apiMando(`/mando/reportes/mapa?${construirQuery(filtros)}`)
+      .then((d) => setPuntosMapa(d.reportes))
+      .catch((err) => setErrorMapa(err.message));
+  }, [filtros]);
 
   function actualizarFiltro(campo, valor) {
     setPagina(1);
@@ -87,6 +105,12 @@ export default function ReportesPage() {
         />
       </div>
 
+      {errorMapa && <p style={{ color: "#B3392E" }}>Error del mapa: {errorMapa}</p>}
+      <MapaOperativo puntos={puntosMapa} onAbrir={abrirDrawer} />
+      <p style={{ fontSize: "0.7rem", color: "#6F5E63", margin: "0.4rem 0 1rem" }}>
+        {puntosMapa.length} punto(s) en el mapa (sin paginar) — la tabla de abajo muestra {POR_PAGINA} a la vez.
+      </p>
+
       {error && <p style={{ color: "#B3392E" }}>Error: {error}</p>}
       {!datos && !error && <p>Cargando…</p>}
 
@@ -115,10 +139,10 @@ export default function ReportesPage() {
                 {datos.reportes.map((r) => (
                   <tr
                     key={r.id}
-                    onClick={() => setDrawerId(r.id)}
+                    onClick={() => abrirDrawer(r.id)}
                     tabIndex={0}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") setDrawerId(r.id);
+                      if (e.key === "Enter") abrirDrawer(r.id);
                     }}
                     style={{ cursor: "pointer", borderTop: "1px solid #E4DCD2" }}
                   >
