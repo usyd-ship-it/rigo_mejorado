@@ -30,6 +30,46 @@ function maskTelefono(telefono) {
   return telefono.slice(0, 3) + " ··· " + telefono.slice(-4);
 }
 
+// Compartida entre GET /reportes y GET /reportes/mapa — mismo comportamiento
+// exacto que antes (primer campo inválido corta con error), sin duplicar.
+function construirFiltrosReportes(query) {
+  const { estatus, zona, colonia, fecha_desde, fecha_hasta } = query;
+  const condiciones = [];
+  const valores = [];
+
+  if (estatus) {
+    if (!ESTATUS_VALIDOS.includes(estatus)) {
+      return { error: { campo: "estatus", motivo: "valor inválido" } };
+    }
+    valores.push(estatus);
+    condiciones.push(`r.estatus = $${valores.length}`);
+  }
+  if (zona) {
+    valores.push(zona);
+    condiciones.push(`r.zona_seccion = $${valores.length}`);
+  }
+  if (colonia) {
+    valores.push(colonia);
+    condiciones.push(`r.colonia_calculada = $${valores.length}`);
+  }
+  if (fecha_desde) {
+    if (Number.isNaN(Date.parse(fecha_desde))) {
+      return { error: { campo: "fecha_desde", motivo: "fecha inválida" } };
+    }
+    valores.push(fecha_desde);
+    condiciones.push(`r.creado_en >= $${valores.length}`);
+  }
+  if (fecha_hasta) {
+    if (Number.isNaN(Date.parse(fecha_hasta))) {
+      return { error: { campo: "fecha_hasta", motivo: "fecha inválida" } };
+    }
+    valores.push(fecha_hasta);
+    condiciones.push(`r.creado_en <= $${valores.length}`);
+  }
+
+  return { condiciones, valores };
+}
+
 router.get("/resumen", async (req, res) => {
   try {
     // unnest(ESTATUS_VALIDOS) como tabla base + LEFT JOIN: garantiza que
@@ -61,43 +101,14 @@ router.get("/resumen", async (req, res) => {
 });
 
 router.get("/reportes", async (req, res) => {
-  const { estatus, zona, colonia, fecha_desde, fecha_hasta } = req.query;
   const pagina = Math.max(1, parseInt(req.query.pagina, 10) || 1);
   const porPagina = Math.min(200, Math.max(1, parseInt(req.query.por_pagina, 10) || 50));
 
-  const condiciones = [];
-  const valores = [];
-
-  if (estatus) {
-    if (!ESTATUS_VALIDOS.includes(estatus)) {
-      return res.status(400).json({ errors: [{ campo: "estatus", motivo: "valor inválido" }] });
-    }
-    valores.push(estatus);
-    condiciones.push(`r.estatus = $${valores.length}`);
+  const filtro = construirFiltrosReportes(req.query);
+  if (filtro.error) {
+    return res.status(400).json({ errors: [filtro.error] });
   }
-  if (zona) {
-    valores.push(zona);
-    condiciones.push(`r.zona_seccion = $${valores.length}`);
-  }
-  if (colonia) {
-    valores.push(colonia);
-    condiciones.push(`r.colonia_calculada = $${valores.length}`);
-  }
-  if (fecha_desde) {
-    if (Number.isNaN(Date.parse(fecha_desde))) {
-      return res.status(400).json({ errors: [{ campo: "fecha_desde", motivo: "fecha inválida" }] });
-    }
-    valores.push(fecha_desde);
-    condiciones.push(`r.creado_en >= $${valores.length}`);
-  }
-  if (fecha_hasta) {
-    if (Number.isNaN(Date.parse(fecha_hasta))) {
-      return res.status(400).json({ errors: [{ campo: "fecha_hasta", motivo: "fecha inválida" }] });
-    }
-    valores.push(fecha_hasta);
-    condiciones.push(`r.creado_en <= $${valores.length}`);
-  }
-
+  const { condiciones, valores } = filtro;
   const where = condiciones.length ? `where ${condiciones.join(" and ")}` : "";
 
   try {
@@ -140,6 +151,34 @@ router.get("/reportes", async (req, res) => {
         actualizado_en: r.actualizado_en,
       })),
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ errors: [{ campo: null, motivo: "error interno" }] });
+  }
+});
+
+// Registrada ANTES de /reportes/:id — si no, Express trataría "mapa"
+// como si fuera el :id del reporte y nunca llegaría aquí.
+router.get("/reportes/mapa", async (req, res) => {
+  const filtro = construirFiltrosReportes(req.query);
+  if (filtro.error) {
+    return res.status(400).json({ errors: [filtro.error] });
+  }
+  const { condiciones, valores } = filtro;
+  const where = condiciones.length ? `where ${condiciones.join(" and ")}` : "";
+
+  // Sin paginación a propósito: son todos los puntos para el mapa. No
+  // hace falta filtrar ubicacion is not null — la columna es NOT NULL.
+  try {
+    const { rows } = await pool.query(
+      `select r.id, r.folio, r.estatus,
+              ST_Y(r.ubicacion::geometry) as lat, ST_X(r.ubicacion::geometry) as lng
+       from reportes r
+       ${where}
+       order by r.creado_en desc`,
+      valores
+    );
+    res.json({ reportes: rows });
   } catch (err) {
     console.error(err);
     res.status(500).json({ errors: [{ campo: null, motivo: "error interno" }] });
