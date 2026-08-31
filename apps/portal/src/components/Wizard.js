@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { EVENTUALIDADES } from "@rigo/catalogo";
 import StepIndicator from "./StepIndicator";
-import StepPlaceholder from "./StepPlaceholder";
 import StepCategoria from "./steps/StepCategoria";
 import StepDetalles, { esDescripcionValida, hayFotoConError } from "./steps/StepDetalles";
+import StepFolio from "./steps/StepFolio";
 import styles from "./Wizard.module.css";
 
 // Leaflet (dentro de StepUbicacion) toca window/document al importarse
@@ -65,11 +65,10 @@ export default function Wizard() {
   // POST /reportes (apps/api) para que un doble clic en "Enviar" no cree
   // dos reportes. Se genera aquí, no en el paso de confirmación, porque
   // debe sobrevivir a que el ciudadano navegue de un lado a otro.
-  const [idempotencyKey] = useState(generarIdempotencyKey);
+  const [idempotencyKey, setIdempotencyKey] = useState(generarIdempotencyKey);
 
-  // Respuesta { folio, estatus, creado_en } de POST /reportes — el paso
-  // de Folio sigue siendo un placeholder por ahora, pero el dato ya
-  // queda disponible en el estado del wizard para el siguiente milestone.
+  // Respuesta { folio, estatus, creado_en } de POST /reportes, mostrada
+  // tal cual en StepFolio.
   const [resultadoEnvio, setResultadoEnvio] = useState(null);
 
   function manejarExitoEnvio(respuesta) {
@@ -77,6 +76,34 @@ export default function Wizard() {
     const siguiente = PASOS.length - 1;
     setPasoActual(siguiente);
     setPasoMaximoVisitado((max) => Math.max(max, siguiente));
+  }
+
+  // "Levantar otro reporte": vuelve al paso 1 y borra TODO — incluida
+  // la llave de idempotencia, que debe ser nueva para la siguiente
+  // sesión de envío, nunca la misma que ya se usó (o se intentó usar).
+  function reiniciarWizard() {
+    detalles.fotos.forEach((foto) => {
+      if (foto.previewUrl) URL.revokeObjectURL(foto.previewUrl);
+    });
+
+    setPasoActual(0);
+    setPasoMaximoVisitado(0);
+    setEventualidadCod(null);
+    setUbicacion({
+      lat: null,
+      lng: null,
+      precision_m: null,
+      ubicacion_confirmada: false,
+      direccion_texto: null,
+    });
+    setDetalles({
+      descripcion: "",
+      fotos: [],
+      nombre: "",
+      telefono: "",
+    });
+    setResultadoEnvio(null);
+    setIdempotencyKey(generarIdempotencyKey());
   }
 
   const eventualidadSeleccionada = useMemo(
@@ -133,14 +160,7 @@ export default function Wizard() {
           />
         )}
 
-        {esUltimoPaso && (
-          <StepPlaceholder
-            icono="🎫"
-            titulo="Folio"
-            descripcion="En cuanto el servidor reciba tu reporte, te va a asignar un folio con el que podrás consultar su estatus más adelante."
-            nota={resultadoEnvio ? `Respuesta del servidor: ${JSON.stringify(resultadoEnvio)}` : undefined}
-          />
-        )}
+        {esUltimoPaso && <StepFolio resultadoEnvio={resultadoEnvio} onReiniciar={reiniciarWizard} />}
       </div>
 
       <footer className={styles.pie}>

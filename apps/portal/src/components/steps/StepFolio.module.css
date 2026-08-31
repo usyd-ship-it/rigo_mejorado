@@ -1,0 +1,149 @@
+.ticket {
+  background: var(--blanco);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  overflow: hidden;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.ticketTop {
+  background: var(--guinda);
+  color: #fff;
+  padding: 16px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ticketTop .t1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.ticketTop .t2 {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--oro-suave);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.ticketMid {
+  padding: 26px 22px;
+  text-align: center;
+  position: relative;
+}
+
+.ticketMid::before,
+.ticketMid::after {
+  content: "";
+  position: absolute;
+  top: -11px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--papel);
+  border: 1px solid var(--linea);
+}
+
+.ticketMid::before {
+  left: -11px;
+}
+
+.ticketMid::after {
+  right: -11px;
+}
+
+.folioLbl {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--tinta-2);
+}
+
+.folioNum {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(1.7rem, 6vw, 2.3rem);
+  color: var(--guinda);
+  letter-spacing: 0.04em;
+  margin: 8px 0 4px;
+  word-break: break-all;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border-radius: var(--radio-pill);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 13px;
+  background: var(--verde-suave);
+  color: var(--verde);
+  margin-top: 4px;
+}
+
+.chip::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.fecha {
+  font-size: 0.82rem;
+  color: var(--tinta-2);
+  margin-top: 10px;
+}
+
+.ticketSep {
+  border-top: 2px dashed var(--linea);
+  margin: 0 22px;
+}
+
+.ticketLow {
+  padding: 18px 22px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.mensaje {
+  max-width: 480px;
+  margin: 18px auto 0;
+  font-size: 0.88rem;
+  color: var(--tinta-2);
+  line-height: 1.55;
+  text-align: center;
+}
+
+.mensaje strong {
+  color: var(--tinta);
+}
+
+.acciones {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.vacio {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px;
+  border: 1.5px dashed var(--linea);
+  border-radius: var(--radio-sm);
+  background: var(--papel-2);
+  color: var(--tinta-2);
+  font-size: 0.9rem;
+  text-align: center;
+}
