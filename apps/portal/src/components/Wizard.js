@@ -13,6 +13,10 @@ import styles from "./Wizard.module.css";
 // — no soporta SSR. Mismo patrón que apps/mando/app/reportes/page.js.
 const StepUbicacion = dynamic(() => import("./steps/StepUbicacion"), { ssr: false });
 
+// El widget de Turnstile (dentro de StepConfirmar) también toca
+// window/document al cargar su script — mismo motivo.
+const StepConfirmar = dynamic(() => import("./steps/StepConfirmar"), { ssr: false });
+
 const PASOS = [
   { id: "categoria", etiqueta: "Categoría" },
   { id: "ubicacion", etiqueta: "Ubicación" },
@@ -63,6 +67,18 @@ export default function Wizard() {
   // debe sobrevivir a que el ciudadano navegue de un lado a otro.
   const [idempotencyKey] = useState(generarIdempotencyKey);
 
+  // Respuesta { folio, estatus, creado_en } de POST /reportes — el paso
+  // de Folio sigue siendo un placeholder por ahora, pero el dato ya
+  // queda disponible en el estado del wizard para el siguiente milestone.
+  const [resultadoEnvio, setResultadoEnvio] = useState(null);
+
+  function manejarExitoEnvio(respuesta) {
+    setResultadoEnvio(respuesta);
+    const siguiente = PASOS.length - 1;
+    setPasoActual(siguiente);
+    setPasoMaximoVisitado((max) => Math.max(max, siguiente));
+  }
+
   const eventualidadSeleccionada = useMemo(
     () => EVENTUALIDADES.find((e) => e.codigo === eventualidadCod) ?? null,
     [eventualidadCod]
@@ -108,11 +124,12 @@ export default function Wizard() {
         {pasoActual === 2 && <StepDetalles detalles={detalles} onCambiar={actualizarDetalles} />}
 
         {pasoActual === 3 && (
-          <StepPlaceholder
-            icono="✅"
-            titulo="Confirmar"
-            descripcion="Vas a revisar un resumen completo de tu reporte — categoría, ubicación, descripción y fotos — antes de enviarlo."
-            nota={`idempotency_key lista para el envío: ${idempotencyKey}`}
+          <StepConfirmar
+            eventualidadSeleccionada={eventualidadSeleccionada}
+            ubicacion={ubicacion}
+            detalles={detalles}
+            idempotencyKey={idempotencyKey}
+            onExito={manejarExitoEnvio}
           />
         )}
 
@@ -121,6 +138,7 @@ export default function Wizard() {
             icono="🎫"
             titulo="Folio"
             descripcion="En cuanto el servidor reciba tu reporte, te va a asignar un folio con el que podrás consultar su estatus más adelante."
+            nota={resultadoEnvio ? `Respuesta del servidor: ${JSON.stringify(resultadoEnvio)}` : undefined}
           />
         )}
       </div>
@@ -129,14 +147,16 @@ export default function Wizard() {
         <button type="button" className="btn btn-borde" onClick={retroceder} disabled={pasoActual === 0}>
           Atrás
         </button>
-        <button
-          type="button"
-          className="btn btn-primario"
-          onClick={continuar}
-          disabled={!puedeContinuar || esUltimoPaso}
-        >
-          Continuar
-        </button>
+        {pasoActual < 3 && (
+          <button
+            type="button"
+            className="btn btn-primario"
+            onClick={continuar}
+            disabled={!puedeContinuar || esUltimoPaso}
+          >
+            Continuar
+          </button>
+        )}
       </footer>
     </section>
   );
