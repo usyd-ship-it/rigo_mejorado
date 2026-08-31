@@ -6,6 +6,7 @@ import { EVENTUALIDADES } from "@rigo/catalogo";
 import StepIndicator from "./StepIndicator";
 import StepPlaceholder from "./StepPlaceholder";
 import StepCategoria from "./steps/StepCategoria";
+import StepDetalles, { esDescripcionValida, hayFotoConError } from "./steps/StepDetalles";
 import styles from "./Wizard.module.css";
 
 // Leaflet (dentro de StepUbicacion) toca window/document al importarse
@@ -44,6 +45,18 @@ export default function Wizard() {
     setUbicacion((prev) => ({ ...prev, ...parcial }));
   }
 
+  // Mismos nombres de campo que espera POST /reportes.
+  const [detalles, setDetalles] = useState({
+    descripcion: "",
+    fotos: [],
+    nombre: "",
+    telefono: "",
+  });
+
+  function actualizarDetalles(parcial) {
+    setDetalles((prev) => ({ ...prev, ...parcial }));
+  }
+
   // Una sola llave por sesión del wizard — viaja como idempotency_key en
   // POST /reportes (apps/api) para que un doble clic en "Enviar" no cree
   // dos reportes. Se genera aquí, no en el paso de confirmación, porque
@@ -61,7 +74,9 @@ export default function Wizard() {
       ? Boolean(eventualidadCod)
       : pasoActual === 1
         ? ubicacion.ubicacion_confirmada === true
-        : true;
+        : pasoActual === 2
+          ? esDescripcionValida(detalles.descripcion) && !hayFotoConError(detalles.fotos)
+          : true;
 
   function irA(indice) {
     if (indice < 0 || indice >= PASOS.length || indice > pasoMaximoVisitado) return;
@@ -90,13 +105,7 @@ export default function Wizard() {
 
         {pasoActual === 1 && <StepUbicacion ubicacion={ubicacion} onCambiar={actualizarUbicacion} />}
 
-        {pasoActual === 2 && (
-          <StepPlaceholder
-            icono="📝"
-            titulo="Detalles"
-            descripcion="Aquí vas a describir lo que está pasando (10 a 2000 caracteres), agregar hasta 5 fotos como evidencia, y dejar tu nombre y teléfono si quieres que te avisemos del avance — ambos son opcionales."
-          />
-        )}
+        {pasoActual === 2 && <StepDetalles detalles={detalles} onCambiar={actualizarDetalles} />}
 
         {pasoActual === 3 && (
           <StepPlaceholder
