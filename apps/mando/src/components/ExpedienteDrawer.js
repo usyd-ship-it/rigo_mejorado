@@ -3,20 +3,79 @@
 import { useEffect, useState } from "react";
 import { apiMando } from "../lib/api-mando";
 
-export default function ExpedienteDrawer({ reporteId, onClose }) {
+// Mismo orden que en apps/api (ESTATUS_VALIDOS) y en app/reportes/page.js.
+const ESTATUS_VALIDOS = [
+  "recibido",
+  "clasificado",
+  "en_atencion",
+  "en_espera",
+  "resuelto",
+  "cerrado",
+  "reabierto",
+  "improcedente",
+];
+
+export default function ExpedienteDrawer({ reporteId, onClose, onEstatusCambiado }) {
   // reporte se reinicia en cada apertura — no hay caché entre drawers,
   // así las url_firmada (expiran 15 min) siempre vienen frescas del
   // fetch de esta sesión del drawer, nunca de una apertura anterior.
   const [reporte, setReporte] = useState(null);
   const [error, setError] = useState(null);
 
+  const [estatusEnCurso, setEstatusEnCurso] = useState(false);
+  const [errorEstatus, setErrorEstatus] = useState(null);
+
+  // Contacto real: solo vive en este estado, nunca se persiste. Se
+  // reinicia junto con el resto en cada apertura — reabrir el drawer
+  // siempre vuelve a pedir "Revelar contacto".
+  const [contactoReal, setContactoReal] = useState(null);
+  const [revelando, setRevelando] = useState(false);
+  const [errorRevelar, setErrorRevelar] = useState(null);
+
   useEffect(() => {
     setReporte(null);
     setError(null);
+    setErrorEstatus(null);
+    setContactoReal(null);
+    setErrorRevelar(null);
     apiMando(`/mando/reportes/${reporteId}`)
       .then(setReporte)
       .catch((err) => setError(err.message));
   }, [reporteId]);
+
+  async function cambiarEstatus(e) {
+    const nuevoEstatus = e.target.value;
+    setEstatusEnCurso(true);
+    setErrorEstatus(null);
+    try {
+      await apiMando(`/mando/reportes/${reporte.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estatus: nuevoEstatus }),
+      });
+      setReporte((r) => ({ ...r, estatus: nuevoEstatus }));
+      onEstatusCambiado?.(reporte.id, nuevoEstatus);
+    } catch (err) {
+      // no tocamos reporte.estatus — el <select> es controlado por ese
+      // valor, así que al no cambiarlo vuelve solo a la opción anterior.
+      setErrorEstatus(err.message);
+    } finally {
+      setEstatusEnCurso(false);
+    }
+  }
+
+  async function revelarContacto() {
+    setRevelando(true);
+    setErrorRevelar(null);
+    try {
+      const real = await apiMando(`/mando/reportes/${reporte.id}/revelar-contacto`, { method: "POST" });
+      setContactoReal(real);
+    } catch (err) {
+      setErrorRevelar(err.message);
+    } finally {
+      setRevelando(false);
+    }
+  }
 
   return (
     <div
@@ -61,6 +120,22 @@ export default function ExpedienteDrawer({ reporteId, onClose }) {
 
         {reporte && (
           <>
+            <Seccion titulo="Estatus">
+              <select value={reporte.estatus} onChange={cambiarEstatus} disabled={estatusEnCurso}>
+                {ESTATUS_VALIDOS.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </select>
+              {estatusEnCurso && (
+                <span style={{ fontSize: "0.75rem", color: "#6F5E63", marginLeft: 8 }}>guardando…</span>
+              )}
+              {errorEstatus && (
+                <p style={{ color: "#B3392E", fontSize: "0.75rem", marginTop: 6 }}>Error: {errorEstatus}</p>
+              )}
+            </Seccion>
+
             <Seccion titulo="Descripción">
               <p>{reporte.descripcion || "—"}</p>
             </Seccion>
@@ -107,10 +182,25 @@ export default function ExpedienteDrawer({ reporteId, onClose }) {
 
             <Seccion titulo="Contacto del ciudadano">
               <p style={{ fontFamily: "monospace", fontSize: "0.85rem" }}>
-                {reporte.contacto
-                  ? `${reporte.contacto.nombre ?? "—"} · ${reporte.contacto.telefono ?? "—"}`
-                  : "Sin contacto registrado"}
+                {contactoReal
+                  ? `${contactoReal.nombre ?? "—"} · ${contactoReal.telefono ?? "—"}`
+                  : reporte.contacto
+                    ? `${reporte.contacto.nombre ?? "—"} · ${reporte.contacto.telefono ?? "—"}`
+                    : "Sin contacto registrado"}
               </p>
+              {reporte.contacto && !contactoReal && (
+                <button onClick={revelarContacto} disabled={revelando} style={{ marginTop: 6 }}>
+                  {revelando ? "Revelando…" : "Revelar contacto"}
+                </button>
+              )}
+              {contactoReal && (
+                <p style={{ fontSize: "0.7rem", color: "#2E7D4F", marginTop: 6 }}>
+                  Revelado en esta sesión del drawer — quedó registrado en bitácora.
+                </p>
+              )}
+              {errorRevelar && (
+                <p style={{ color: "#B3392E", fontSize: "0.75rem", marginTop: 6 }}>Error: {errorRevelar}</p>
+              )}
             </Seccion>
 
             <Seccion titulo="Bitácora de auditoría">

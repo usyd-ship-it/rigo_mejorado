@@ -48,6 +48,15 @@ export default function ReportesPage() {
   const [drawerId, setDrawerId] = useState(null);
   const abrirDrawer = useCallback((id) => setDrawerId(id), []);
 
+  // Actualiza tabla y mapa en el sitio cuando el drawer confirma un
+  // cambio de estatus exitoso — sin refetch completo de la lista.
+  const actualizarEstatusLocal = useCallback((id, nuevoEstatus) => {
+    setDatos((prev) =>
+      prev ? { ...prev, reportes: prev.reportes.map((r) => (r.id === id ? { ...r, estatus: nuevoEstatus } : r)) } : prev
+    );
+    setPuntosMapa((prev) => prev.map((p) => (p.id === id ? { ...p, estatus: nuevoEstatus } : p)));
+  }, []);
+
   // Tabla — paginada, depende de filtros + página.
   useEffect(() => {
     apiMando(`/mando/reportes?${construirQuery(filtros, { pagina, por_pagina: POR_PAGINA })}`)
@@ -172,7 +181,13 @@ export default function ReportesPage() {
         </>
       )}
 
-      {drawerId && <ExpedienteDrawer reporteId={drawerId} onClose={() => setDrawerId(null)} />}
+      {drawerId && (
+        <ExpedienteDrawer
+          reporteId={drawerId}
+          onClose={() => setDrawerId(null)}
+          onEstatusCambiado={actualizarEstatusLocal}
+        />
+      )}
     </main>
   );
 }
