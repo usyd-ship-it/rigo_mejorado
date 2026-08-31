@@ -1,0 +1,185 @@
+/* Tokens — paleta de CLAUDE.md §11, misma base que index.html/mando.html */
+:root {
+  --guinda: #7a1f2b;
+  --guinda-2: #5c1420;
+  --guinda-3: #93293a;
+  --oro: #c2953a;
+  --oro-suave: #f3e7cb;
+  --papel: #f7f4ef;
+  --papel-2: #fbf9f5;
+  --tinta: #271a1e;
+  --tinta-2: #6f5e63;
+  --linea: #e4dcd2;
+  --blanco: #ffffff;
+  --verde: #2e7d4f;
+  --verde-suave: #e3f1e8;
+  --rojo: #b3392e;
+  --rojo-suave: #fbeae7;
+
+  --radio: 16px;
+  --radio-sm: 10px;
+  --radio-pill: 999px;
+  --sombra: 0 16px 36px -18px rgba(39, 26, 30, 0.28);
+  --transicion: 0.16s ease;
+
+  --font-display: "Archivo", system-ui, sans-serif;
+  --font-texto: "Public Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--font-texto);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.4em;
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: var(--guinda);
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* Estados de foco reales — nunca depender solo del outline por default del navegador */
+:focus-visible {
+  outline: 3px solid var(--oro);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Botones — clases de utilidad compartidas por toda la app */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1.5px solid transparent;
+  border-radius: var(--radio-sm);
+  padding: 13px 22px;
+  font-weight: 700;
+  font-size: 0.94rem;
+  transition: background var(--transicion), border-color var(--transicion), color var(--transicion), transform var(--transicion);
+  white-space: nowrap;
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+.btn-primario {
+  background: var(--guinda);
+  color: #fff;
+}
+
+.btn-primario:hover:not(:disabled) {
+  background: var(--guinda-3);
+}
+
+.btn-borde {
+  background: transparent;
+  border-color: var(--linea);
+  color: var(--tinta);
+}
+
+.btn-borde:hover:not(:disabled) {
+  border-color: var(--guinda);
+  color: var(--guinda);
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--guinda);
+  margin: 0 0 10px;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 24px;
+  height: 2px;
+  background: var(--oro);
+  display: inline-block;
+}

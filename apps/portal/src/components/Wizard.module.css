@@ -1,0 +1,156 @@
+.wizard {
+  background: var(--blanco);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  overflow: hidden;
+  margin-top: 22px;
+}
+
+/* ---------- Indicador de progreso ---------- */
+.indicador {
+  border-bottom: 1px solid var(--linea);
+  background: var(--papel-2);
+}
+
+.indicador ol {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.indicador ol::-webkit-scrollbar {
+  display: none;
+}
+
+.paso {
+  flex: 1 0 auto;
+  min-width: 108px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 13px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--tinta-2);
+  white-space: nowrap;
+  transition: color var(--transicion), border-color var(--transicion);
+}
+
+.paso:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.paso[data-estado="activo"] {
+  color: var(--guinda);
+  border-bottom-color: var(--guinda);
+}
+
+.paso[data-estado="hecho"] {
+  color: var(--verde);
+}
+
+.paso[data-estado="hecho"]:not(:disabled):hover {
+  color: var(--guinda);
+}
+
+.numero {
+  font-family: var(--font-mono);
+  color: var(--oro);
+}
+
+.paso[data-estado="activo"] .numero {
+  color: var(--guinda);
+}
+
+/* ---------- Cuerpo ---------- */
+.cuerpo {
+  padding: 24px 18px;
+  min-height: 320px;
+}
+
+@media (min-width: 640px) {
+  .cuerpo {
+    padding: 30px 26px;
+  }
+}
+
+/* ---------- Pie con navegación ---------- */
+.pie {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 18px;
+  border-top: 1px solid var(--linea);
+  background: var(--papel-2);
+}
+
+@media (min-width: 640px) {
+  .pie {
+    padding: 18px 26px;
+  }
+}
+
+/* ---------- Placeholder de pasos futuros ---------- */
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1.5px dashed var(--linea);
+  border-radius: var(--radio-sm);
+  padding: 24px 20px;
+  background: repeating-linear-gradient(
+      0deg,
+      #f2eee7 0 1px,
+      transparent 1px 26px
+    ),
+    repeating-linear-gradient(90deg, #f2eee7 0 1px, transparent 1px 26px), var(--papel-2);
+}
+
+.placeholderIco {
+  font-size: 1.6rem;
+  margin-bottom: 6px;
+}
+
+.placeholder h2 {
+  font-size: 1.05rem;
+}
+
+.placeholder p {
+  color: var(--tinta-2);
+  font-size: 0.9rem;
+  margin-bottom: 0;
+}
+
+.placeholderAviso {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--oro);
+  margin-top: 12px !important;
+}
+
+.placeholderNota {
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  color: var(--tinta-2);
+  background: var(--blanco);
+  border: 1px solid var(--linea);
+  border-radius: var(--radio-sm);
+  padding: 10px 12px;
+  word-break: break-all;
+}
+
+.placeholderNota code {
+  color: var(--guinda);
+}
