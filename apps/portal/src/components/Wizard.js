@@ -1,11 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { EVENTUALIDADES } from "@rigo/catalogo";
 import StepIndicator from "./StepIndicator";
 import StepPlaceholder from "./StepPlaceholder";
 import StepCategoria from "./steps/StepCategoria";
 import styles from "./Wizard.module.css";
+
+// Leaflet (dentro de StepUbicacion) toca window/document al importarse
+// — no soporta SSR. Mismo patrón que apps/mando/app/reportes/page.js.
+const StepUbicacion = dynamic(() => import("./steps/StepUbicacion"), { ssr: false });
 
 const PASOS = [
   { id: "categoria", etiqueta: "Categoría" },
@@ -25,6 +30,20 @@ export default function Wizard() {
   const [pasoMaximoVisitado, setPasoMaximoVisitado] = useState(0);
   const [eventualidadCod, setEventualidadCod] = useState(null);
 
+  // Nombres de campo exactos del contrato de POST /reportes (apps/api)
+  // para que el paso de Confirmar no tenga que traducir nada.
+  const [ubicacion, setUbicacion] = useState({
+    lat: null,
+    lng: null,
+    precision_m: null,
+    ubicacion_confirmada: false,
+    direccion_texto: null,
+  });
+
+  function actualizarUbicacion(parcial) {
+    setUbicacion((prev) => ({ ...prev, ...parcial }));
+  }
+
   // Una sola llave por sesión del wizard — viaja como idempotency_key en
   // POST /reportes (apps/api) para que un doble clic en "Enviar" no cree
   // dos reportes. Se genera aquí, no en el paso de confirmación, porque
@@ -37,7 +56,12 @@ export default function Wizard() {
   );
 
   const esUltimoPaso = pasoActual === PASOS.length - 1;
-  const puedeContinuar = pasoActual === 0 ? Boolean(eventualidadCod) : true;
+  const puedeContinuar =
+    pasoActual === 0
+      ? Boolean(eventualidadCod)
+      : pasoActual === 1
+        ? ubicacion.ubicacion_confirmada === true
+        : true;
 
   function irA(indice) {
     if (indice < 0 || indice >= PASOS.length || indice > pasoMaximoVisitado) return;
@@ -64,13 +88,7 @@ export default function Wizard() {
           <StepCategoria eventualidadCod={eventualidadCod} onSeleccionar={setEventualidadCod} />
         )}
 
-        {pasoActual === 1 && (
-          <StepPlaceholder
-            icono="📍"
-            titulo="Ubicación"
-            descripcion="Vas a fijar un pin en el mapa — con zoom-lock a nivel calle, círculo de precisión GPS, confirmación por geocodificación inversa y aviso si el punto queda fuera del municipio. El pin es obligatorio: la colonia se calcula sola a partir de tu coordenada, tú no la escribes."
-          />
-        )}
+        {pasoActual === 1 && <StepUbicacion ubicacion={ubicacion} onCambiar={actualizarUbicacion} />}
 
         {pasoActual === 2 && (
           <StepPlaceholder

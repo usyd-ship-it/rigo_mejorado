@@ -1,0 +1,31 @@
+.mapa {
+  height: 320px;
+  border-radius: var(--radio-sm);
+  border: 1.5px solid var(--linea);
+  z-index: 1;
+}
+
+.pinEnvoltura {
+  filter: drop-shadow(0 6px 8px rgba(39, 26, 30, 0.35));
+}
+
+.pin {
+  width: 30px;
+  height: 30px;
+  background: var(--guinda);
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  position: relative;
+}
+
+.pin::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 9px;
+  height: 9px;
+  background: var(--oro);
+  border-radius: 50%;
+}
