@@ -19,6 +19,15 @@ const TIPOS_PERMITIDOS = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 const limiterReportes = rateLimit({ windowMs: 60 * 60 * 1000, limit: 10 });
 
+// Endpoint de solo lectura, pero público y sin auth — el riesgo real no
+// es carga, es enumeración: el folio es predecible (código + consecutivo
+// global de 6 dígitos, §CLAUDE.md "mecánica del folio"), así que alguien
+// podría barrer folios al azar buscando cuáles existen. Más holgado que
+// limiterReportes (que protege un INSERT) pero acotado para que barrer
+// miles de folios sea impráctico; un ciudadano real revisando su propio
+// folio unas cuantas veces en una sesión no lo topa.
+const limiterConsultaFolio = rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 });
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024, files: 5 },
@@ -181,6 +190,46 @@ router.post("/", limiterReportes, subirFotos, async (req, res) => {
     res.status(500).json({ errors: [{ campo: null, motivo: "error interno" }] });
   } finally {
     client.release();
+  }
+});
+
+// Consulta pública de folio — el ciudadano ve estrictamente lo que
+// necesita para dar seguimiento a SU reporte. Nunca contacto (ni
+// enmascarado), evidencias, bitácora, coordenadas exactas ni
+// duplicado_de — eso vive solo en GET /mando/reportes/:id (con auth).
+// El folio se busca tal cual llega, sin reformatear ni parsearlo en
+// partes — su forma interna (código + consecutivo) es un detalle de
+// apps/api, no algo que este endpoint deba entender o validar.
+router.get("/:folio", limiterConsultaFolio, async (req, res) => {
+  const { folio } = req.params;
+
+  try {
+    const { rows } = await pool.query(
+      `select
+         r.folio, r.estatus, r.colonia_calculada, r.creado_en, r.actualizado_en,
+         e.codigo as eventualidad_cod, e.nombre as eventualidad_nombre
+       from reportes r
+       join eventualidades e on e.codigo = r.eventualidad_cod
+       where r.folio = $1`,
+      [folio]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ errors: [{ campo: "folio", motivo: "reporte no encontrado" }] });
+    }
+    const r = rows[0];
+
+    res.json({
+      folio: r.folio,
+      estatus: r.estatus,
+      eventualidad: { codigo: r.eventualidad_cod, nombre: r.eventualidad_nombre },
+      colonia_calculada: r.colonia_calculada,
+      creado_en: r.creado_en,
+      actualizado_en: r.actualizado_en,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ errors: [{ campo: null, motivo: "error interno" }] });
   }
 });
 
