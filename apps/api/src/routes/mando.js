@@ -1,10 +1,18 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { pool } from "../lib/db.js";
 import { requireMando } from "../lib/auth.js";
 import { urlFirmada } from "../lib/r2.js";
+import { subirFotos, validarReporte, crearReporte } from "../lib/reportes.js";
 
 const router = Router();
 router.use(requireMando);
+
+// Más holgado que el público (POST /reportes: 10/hora, para desconocidos
+// anónimos) porque son operadores ya autenticados, no cero porque una
+// cuenta comprometida o un bug de UI en bucle no debería poder crear
+// reportes sin límite.
+const limiterReportesManual = rateLimit({ windowMs: 10 * 60 * 1000, limit: 20 });
 
 const ESTATUS_VALIDOS = [
   "recibido",
@@ -94,6 +102,31 @@ router.get("/resumen", async (req, res) => {
       por_estatus: rows,
       porcentaje_resuelto: porcentajeResuelto,
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ errors: [{ campo: null, motivo: "error interno" }] });
+  }
+});
+
+// Levantar un reporte manualmente (ciudadano en ventanilla o por
+// teléfono) — reusa exactamente la misma validación e inserción que
+// POST /reportes (apps/api/src/lib/reportes.js), sin turnstile_token
+// (el operador ya pasó por requireMando) y con origen fijo en 'CC'
+// (valor ya aceptado por el CHECK constraint de reportes.origen; no es
+// arbitrario ni viene del body). La bitácora usa el mismo evento
+// 'cambio_estatus' / estatus_nuevo 'recibido' que el flujo público,
+// pero con usuario_id = req.usuario.id — eso ya distingue un reporte
+// creado por un operador de uno anónimo, sin necesitar un evento nuevo.
+router.post("/reportes", limiterReportesManual, subirFotos, async (req, res) => {
+  const { errores, valores } = await validarReporte(req.body, req.files);
+
+  if (errores.length > 0) {
+    return res.status(400).json({ errors: errores });
+  }
+
+  try {
+    const respuesta = await crearReporte({ valores, origen: "CC", usuarioId: req.usuario.id });
+    res.status(201).json(respuesta);
   } catch (err) {
     console.error(err);
     res.status(500).json({ errors: [{ campo: null, motivo: "error interno" }] });
